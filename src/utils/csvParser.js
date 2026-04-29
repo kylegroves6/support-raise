@@ -1,0 +1,118 @@
+import Papa from 'papaparse'
+import { v4 as uuidv4 } from 'uuid'
+
+const BOOL_TRUE = new Set(['yes', 'true', '1'])
+
+function parseBool(val) {
+  if (!val) return false
+  return BOOL_TRUE.has(String(val).trim().toLowerCase())
+}
+
+function parseGiftAmount(val) {
+  if (!val) return 0
+  const cleaned = String(val).replace(/[$,\s]/g, '')
+  const n = parseFloat(cleaned)
+  return isNaN(n) ? 0 : n
+}
+
+function parseInt2(val) {
+  if (!val || String(val).trim() === '') return null
+  const n = parseInt(String(val).trim(), 10)
+  return isNaN(n) ? null : n
+}
+
+const COLUMN_MAP = {
+  'Full Name': 'fullName',
+  'Relationship': 'relationship',
+  'Returning': 'returning',
+  'Top Priority': 'topPriority',
+  'Address Status': 'addressStatus',
+  'Sent': 'sent',
+  'Letter Address Name': 'letterAddressName',
+  'Salutation': 'salutation',
+  'Letter Printed?': 'letterPrinted',
+  'Main Envelope Printed?': 'mainEnvelopePrinted',
+  'Thank-you Sent?': 'thankYouSent',
+  'Notes': 'notes',
+  'Street Address': 'streetAddress',
+  'City': 'city',
+  'State': 'state',
+  'Zip': 'zip',
+  'Concatenated Address': 'concatenatedAddress',
+  'Phone': 'phone',
+  'Call Made?': 'callMade',
+  'Email Address': 'email',
+  'Financial Partner': 'financialPartner',
+  'Prayer Partner': 'prayerPartner',
+  'Pledged to Give': 'pledgedToGive',
+  'Form of Gift Received': 'formOfGift',
+  'Gift Amount': 'giftAmount',
+  'Date Received': 'dateReceived',
+}
+
+const BOOL_FIELDS = new Set([
+  'returning', 'sent', 'letterPrinted', 'mainEnvelopePrinted',
+  'thankYouSent', 'callMade', 'financialPartner', 'prayerPartner',
+  'pledgedToGive',
+])
+
+export function parseCSV(csvText) {
+  const result = Papa.parse(csvText, {
+    header: true,
+    skipEmptyLines: true,
+  })
+
+  const detectedHeaders = result.meta?.fields ?? []
+  const expectedHeaders = Object.keys(COLUMN_MAP)
+  const missingHeaders = expectedHeaders.filter(h => !detectedHeaders.includes(h))
+  const unmappedHeaders = detectedHeaders.filter(h => !COLUMN_MAP[h])
+
+  const rows = result.data
+  const contacts = []
+  const skippedRows = []
+  const rowErrors = []
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    const mapped = {}
+
+    for (const [csvCol, field] of Object.entries(COLUMN_MAP)) {
+      const val = row[csvCol]
+      try {
+        if (field === 'topPriority') {
+          mapped[field] = parseInt2(val)
+        } else if (field === 'giftAmount') {
+          mapped[field] = parseGiftAmount(val)
+        } else if (BOOL_FIELDS.has(field)) {
+          mapped[field] = parseBool(val)
+        } else {
+          mapped[field] = val ? String(val).trim() : ''
+        }
+      } catch (err) {
+        rowErrors.push({ row: i + 2, col: csvCol, val, error: err.message })
+      }
+    }
+
+    if (!mapped.fullName && !mapped.relationship) {
+      skippedRows.push(i + 2)
+      continue
+    }
+
+    contacts.push({ id: uuidv4(), ...mapped })
+  }
+
+  return {
+    contacts,
+    diagnostics: {
+      totalRows: rows.length,
+      imported: contacts.length,
+      skipped: skippedRows.length,
+      skippedRows,
+      missingHeaders,
+      unmappedHeaders,
+      rowErrors,
+      papaParseMeta: result.meta,
+      papaParseErrors: result.errors,
+    },
+  }
+}
