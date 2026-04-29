@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { exportCSV } from '../utils/csvParser'
 
 const RELATIONSHIPS = [
   "Friend's Parents", "Sumner Teacher", "Family", "Friend", "Professor",
@@ -42,6 +43,9 @@ function Th({ label, field, sort, onSort }) {
 }
 
 export default function ContactsTable({ contacts, onEdit, onAdd, onImport }) {
+  function handleExport() {
+    exportCSV(contacts)
+  }
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({
     relationship: '',
@@ -122,6 +126,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport }) {
         />
         <div className="flex gap-2">
           <button className="btn-secondary" onClick={onImport}>Import CSV</button>
+          <button className="btn-secondary" onClick={handleExport} disabled={contacts.length === 0}>Export CSV</button>
           <button className="btn-primary" onClick={onAdd}>+ Add Contact</button>
         </div>
       </div>

@@ -56,6 +56,36 @@ const BOOL_FIELDS = new Set([
   'pledgedToGive',
 ])
 
+const COLUMN_MAP_INVERSE = Object.fromEntries(
+  Object.entries(COLUMN_MAP).map(([csvCol, field]) => [field, csvCol])
+)
+
+export function exportCSV(contacts) {
+  const rows = contacts.map(c => {
+    const row = {}
+    for (const [field, csvCol] of Object.entries(COLUMN_MAP_INVERSE)) {
+      const val = c[field]
+      if (BOOL_FIELDS.has(field)) {
+        row[csvCol] = val ? 'Yes' : 'No'
+      } else if (field === 'giftAmount') {
+        row[csvCol] = val != null ? val : ''
+      } else {
+        row[csvCol] = val ?? ''
+      }
+    }
+    return row
+  })
+
+  const csv = Papa.unparse(rows, { columns: Object.keys(COLUMN_MAP) })
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `contacts-export-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export function parseCSV(csvText) {
   const result = Papa.parse(csvText, {
     header: true,
