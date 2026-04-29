@@ -4,12 +4,12 @@ import { supabase } from '../lib/supabase'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [mode, setMode] = useState('login') // 'login' | 'signup'
-  const [error, setError] = useState(null)
+  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState(null)
+  const [message, setMessage] = useState<string | null>(null)
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setMessage(null)
@@ -24,7 +24,7 @@ export default function LoginPage() {
         setMessage('Check your email to confirm your account.')
       }
     } catch (err) {
-      setError(err.message)
+      setError((err as Error).message)
     } finally {
       setLoading(false)
     }

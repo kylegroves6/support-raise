@@ -1,17 +1,25 @@
 import { useMemo, useState } from 'react'
 import GoalSettings from './GoalSettings'
+import type { Contact, Goals } from '../types'
 
-function fmt(n) {
+function fmt(n: number): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
-function fmtAccounting(n) {
+function fmtAccounting(n: number): string {
   const abs = Math.abs(n)
   const formatted = abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   return n < 0 ? `($${formatted})` : `$${formatted}`
 }
 
-function StatCard({ label, value, sub, color }) {
+interface StatCardProps {
+  label: string
+  value: number
+  sub?: string
+  color?: string
+}
+
+function StatCard({ label, value, sub, color }: StatCardProps) {
   return (
     <div className="card flex flex-col gap-1">
       <p className="text-xs font-medium uppercase tracking-wide text-stone-warm">{label}</p>
@@ -21,7 +29,13 @@ function StatCard({ label, value, sub, color }) {
   )
 }
 
-function ContactRow({ contact, onEdit, showPledged }) {
+interface ContactRowProps {
+  contact: Contact
+  onEdit: (contact: Contact) => void
+  showPledged?: boolean
+}
+
+function ContactRow({ contact, onEdit, showPledged }: ContactRowProps) {
   return (
     <div
       className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-cream-100 cursor-pointer transition-colors"
@@ -43,7 +57,15 @@ function ContactRow({ contact, onEdit, showPledged }) {
   )
 }
 
-export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, onEditContact }) {
+interface DashboardProps {
+  contacts: Contact[]
+  goals: Goals
+  totalGoal: number
+  onUpdateGoals: (updates: Partial<Goals>) => void
+  onEditContact: (contact: Contact) => void
+}
+
+export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, onEditContact }: DashboardProps) {
   const [showGoalSettings, setShowGoalSettings] = useState(false)
 
   const stats = useMemo(() => {
@@ -54,7 +76,6 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
       .reduce((s, c) => s + (c.giftAmount || 0), 0)
 
     const prayerPartners = contacts.filter(c => c.prayerPartner)
-
     const pledgedNotReceivedCount = contacts.filter(c => c.pledgedToGive && !c.financialPartner).length
 
     return {
@@ -82,7 +103,7 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
     const getContactInfo = nonPledgedFollowUp.filter(c => !c.phone || c.phone.trim() === '')
     const reachOutNext = contacts
       .filter(c => !c.sent && c.topPriority != null)
-      .sort((a, b) => a.topPriority - b.topPriority)
+      .sort((a, b) => (a.topPriority ?? 0) - (b.topPriority ?? 0))
     const awaitingGift = contacts.filter(c => c.pledgedToGive && !c.financialPartner)
     const sendThankYou = contacts.filter(c => c.financialPartner && !c.thankYouSent)
 
@@ -92,11 +113,9 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
   const pctReceived = Math.min((stats.totalReceived / totalGoal) * 100, 100)
   const tripPct = Math.min((goals.tripCost / totalGoal) * 100, 100)
   const foodPct = Math.min((goals.foodReimbursement / totalGoal) * 100, 100)
-  const sfPct = Math.min((goals.sfFlight / totalGoal) * 100, 100)
 
   return (
     <div className="space-y-6">
-      {/* Progress Section */}
       <div className="card">
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -109,13 +128,11 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
           </div>
         </div>
 
-        {/* Segmented progress bar */}
         <div className="relative h-6 rounded-full bg-cream-200 overflow-hidden mb-3">
           <div
             className="absolute left-0 top-0 h-full bg-sage-400 transition-all duration-500"
             style={{ width: `${pctReceived}%` }}
           />
-          {/* Segment dividers */}
           <div
             className="absolute top-0 bottom-0 w-px bg-white/60"
             style={{ left: `${tripPct}%` }}
@@ -146,10 +163,8 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
             Edit goals
           </button>
         </div>
-
       </div>
 
-      {/* Gifts Received Breakdown */}
       <div className="card">
         <h3 className="text-sm font-semibold text-stone-dark mb-3">Gifts Received</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -171,7 +186,6 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         <StatCard label="Total Contacts" value={stats.total} />
         <StatCard label="People Contacted" value={stats.sent} sub={`${stats.total - stats.sent} remaining`} />
@@ -179,7 +193,6 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
         <StatCard label="Partners" value={stats.partners} color="text-sage-600" />
       </div>
 
-      {/* Action Lists */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ActionList
           title="Follow Up Now"
@@ -237,7 +250,17 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
   )
 }
 
-function ActionList({ title, description, items, onEdit, emptyMsg, badgeColor, showPledged }) {
+interface ActionListProps {
+  title: string
+  description: string
+  items: Contact[]
+  onEdit: (contact: Contact) => void
+  emptyMsg: string
+  badgeColor: string
+  showPledged?: boolean
+}
+
+function ActionList({ title, description, items, onEdit, emptyMsg, badgeColor, showPledged }: ActionListProps) {
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-3">

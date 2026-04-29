@@ -8,8 +8,10 @@ import ContactsTable from './components/ContactsTable'
 import ContactModal from './components/ContactModal'
 import CSVImport from './components/CSVImport'
 import LoginPage from './components/LoginPage'
+import type { Contact, ImportMode } from './types'
 
-const TABS = ['Dashboard', 'Contacts']
+const TABS = ['Dashboard', 'Contacts'] as const
+type Tab = typeof TABS[number]
 
 export default function App() {
   const session = useSession()
@@ -24,16 +26,16 @@ function AuthenticatedApp() {
   const { contacts, addContact, updateContact, deleteContact, importContacts, replaceAll } = useContacts()
   const { goals, totalGoal, updateGoals } = useGoalSettings()
 
-  const [tab, setTab] = useState('Dashboard')
-  const [editingContact, setEditingContact] = useState(null)
+  const [tab, setTab] = useState<Tab>('Dashboard')
+  const [editingContact, setEditingContact] = useState<Contact | null>(null)
   const [addingContact, setAddingContact] = useState(false)
   const [showImport, setShowImport] = useState(false)
 
-  function handleEditContact(contact) {
+  function handleEditContact(contact: Contact) {
     setEditingContact(contact)
   }
 
-  function handleSaveContact(data) {
+  function handleSaveContact(data: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>) {
     if (editingContact) {
       updateContact(editingContact.id, data)
     } else {
@@ -43,12 +45,12 @@ function AuthenticatedApp() {
     setAddingContact(false)
   }
 
-  function handleDeleteContact(id) {
+  function handleDeleteContact(id: string) {
     deleteContact(id)
     setEditingContact(null)
   }
 
-  function handleImport(contacts, mode) {
+  function handleImport(contacts: Contact[], mode: ImportMode) {
     if (mode === 'replace') {
       replaceAll(contacts)
     } else {
@@ -63,7 +65,6 @@ function AuthenticatedApp() {
 
   return (
     <div className="min-h-screen bg-cream-100">
-      {/* Header */}
       <header className="bg-white border-b border-cream-300 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14">
@@ -102,7 +103,6 @@ function AuthenticatedApp() {
         </div>
       </header>
 
-      {/* Main */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {tab === 'Dashboard' && (
           <Dashboard
@@ -123,7 +123,6 @@ function AuthenticatedApp() {
         )}
       </main>
 
-      {/* Modals */}
       {(editingContact || addingContact) && (
         <ContactModal
           contact={editingContact}

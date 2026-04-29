@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { exportCSV } from '../utils/csvParser'
+import type { Contact } from '../types'
 
 const RELATIONSHIPS = [
   "Friend's Parents", "Sumner Teacher", "Family", "Friend", "Professor",
@@ -11,8 +12,10 @@ const ADDRESS_STATUSES = [
   "Contacted", "Hand Delivery", "Email", "Text",
 ]
 
-function Chip({ label, color }) {
-  const colors = {
+type ChipColor = 'green' | 'amber' | 'red' | 'blue' | 'gray' | 'cream'
+
+function Chip({ label, color }: { label: string; color: ChipColor }) {
+  const colors: Record<ChipColor, string> = {
     green: 'bg-sage-100 text-sage-600',
     amber: 'bg-amber-50 text-amber-700',
     red: 'bg-red-50 text-red-500',
@@ -21,16 +24,26 @@ function Chip({ label, color }) {
     cream: 'bg-cream-200 text-stone-warm',
   }
   return (
-    <span className={`chip ${colors[color] || colors.gray}`}>{label}</span>
+    <span className={`chip ${colors[color]}`}>{label}</span>
   )
 }
 
-function SortIcon({ dir }) {
+type SortDir = 'asc' | 'desc'
+type SortField = keyof Contact
+
+function SortIcon({ dir }: { dir: SortDir | null }) {
   if (!dir) return <span className="text-stone-light ml-1">↕</span>
   return <span className="text-sage-500 ml-1">{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
-function Th({ label, field, sort, onSort }) {
+interface ThProps {
+  label: string
+  field: SortField
+  sort: { field: SortField; dir: SortDir }
+  onSort: (field: SortField) => void
+}
+
+function Th({ label, field, sort, onSort }: ThProps) {
   return (
     <th
       className="text-left px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-stone-warm cursor-pointer hover:text-stone-dark select-none whitespace-nowrap"
@@ -42,28 +55,43 @@ function Th({ label, field, sort, onSort }) {
   )
 }
 
-export default function ContactsTable({ contacts, onEdit, onAdd, onImport }) {
+interface Filters {
+  relationship: string
+  addressStatus: string
+  sent: string
+  callMade: string
+  financialPartner: string
+}
+
+interface Props {
+  contacts: Contact[]
+  onEdit: (contact: Contact) => void
+  onAdd: () => void
+  onImport: () => void
+}
+
+export default function ContactsTable({ contacts, onEdit, onAdd, onImport }: Props) {
   function handleExport() {
     exportCSV(contacts)
   }
   const [search, setSearch] = useState('')
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<Filters>({
     relationship: '',
     addressStatus: '',
     sent: '',
     callMade: '',
     financialPartner: '',
   })
-  const [sort, setSort] = useState({ field: 'fullName', dir: 'asc' })
+  const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'fullName', dir: 'asc' })
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 25
 
-  function setFilter(key, val) {
+  function setFilter(key: keyof Filters, val: string) {
     setFilters(f => ({ ...f, [key]: val }))
     setPage(1)
   }
 
-  function handleSort(field) {
+  function handleSort(field: SortField) {
     setSort(s => ({
       field,
       dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc',
@@ -91,10 +119,12 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport }) {
     if (filters.financialPartner !== '') rows = rows.filter(c => c.financialPartner === (filters.financialPartner === 'true'))
 
     rows = [...rows].sort((a, b) => {
-      let va = a[sort.field] ?? ''
-      let vb = b[sort.field] ?? ''
+      let va: string | number | boolean | null | undefined = a[sort.field]
+      let vb: string | number | boolean | null | undefined = b[sort.field]
       if (typeof va === 'boolean') va = va ? 1 : 0
       if (typeof vb === 'boolean') vb = vb ? 1 : 0
+      va = va ?? ''
+      vb = vb ?? ''
       if (va < vb) return sort.dir === 'asc' ? -1 : 1
       if (va > vb) return sort.dir === 'asc' ? 1 : -1
       return 0
@@ -116,7 +146,6 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport }) {
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3">
         <input
           className="input-field flex-1"
@@ -131,7 +160,6 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport }) {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="card py-3">
         <div className="flex flex-wrap gap-2 items-center">
           <span className="text-xs font-medium text-stone-warm">Filter:</span>
@@ -174,7 +202,6 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport }) {
         </div>
       </div>
 
-      {/* Table */}
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -248,7 +275,6 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport }) {
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-cream-200 bg-cream-50">
             <button

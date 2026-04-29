@@ -1,6 +1,14 @@
 import { useState } from 'react'
+import type { Goals } from '../types'
 
-export default function GoalSettings({ goals, totalGoal, onUpdate, onClose }) {
+interface Props {
+  goals: Goals
+  totalGoal: number
+  onUpdate: (updates: Partial<Goals>) => void
+  onClose: () => void
+}
+
+export default function GoalSettings({ goals, onUpdate, onClose }: Props) {
   const [form, setForm] = useState({
     tripCost: goals.tripCost,
     foodReimbursement: goals.foodReimbursement,
@@ -9,9 +17,9 @@ export default function GoalSettings({ goals, totalGoal, onUpdate, onClose }) {
 
   function handleSave() {
     onUpdate({
-      tripCost: parseFloat(form.tripCost) || 0,
-      foodReimbursement: parseFloat(form.foodReimbursement) || 0,
-      sfFlight: parseFloat(form.sfFlight) || 0,
+      tripCost: parseFloat(String(form.tripCost)) || 0,
+      foodReimbursement: parseFloat(String(form.foodReimbursement)) || 0,
+      sfFlight: parseFloat(String(form.sfFlight)) || 0,
     })
     onClose()
   }
@@ -33,7 +41,7 @@ export default function GoalSettings({ goals, totalGoal, onUpdate, onClose }) {
                 className="input-field pl-7"
                 type="number"
                 value={form.tripCost}
-                onChange={e => setForm(f => ({ ...f, tripCost: e.target.value }))}
+                onChange={e => setForm(f => ({ ...f, tripCost: parseFloat(e.target.value) || 0 }))}
               />
             </div>
           </div>
@@ -45,7 +53,7 @@ export default function GoalSettings({ goals, totalGoal, onUpdate, onClose }) {
                 className="input-field pl-7"
                 type="number"
                 value={form.foodReimbursement}
-                onChange={e => setForm(f => ({ ...f, foodReimbursement: e.target.value }))}
+                onChange={e => setForm(f => ({ ...f, foodReimbursement: parseFloat(e.target.value) || 0 }))}
               />
             </div>
           </div>
@@ -57,7 +65,7 @@ export default function GoalSettings({ goals, totalGoal, onUpdate, onClose }) {
                 className="input-field pl-7"
                 type="number"
                 value={form.sfFlight}
-                onChange={e => setForm(f => ({ ...f, sfFlight: e.target.value }))}
+                onChange={e => setForm(f => ({ ...f, sfFlight: parseFloat(e.target.value) || 0 }))}
               />
             </div>
           </div>
@@ -66,7 +74,7 @@ export default function GoalSettings({ goals, totalGoal, onUpdate, onClose }) {
             <div className="flex justify-between text-sm">
               <span className="text-stone-warm">Total Goal</span>
               <span className="font-semibold text-stone-dark">
-                ${(parseFloat(form.tripCost) + parseFloat(form.foodReimbursement) + parseFloat(form.sfFlight)).toLocaleString()}
+                ${(form.tripCost + form.foodReimbursement + form.sfFlight).toLocaleString()}
               </span>
             </div>
           </div>

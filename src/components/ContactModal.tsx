@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { Contact } from '../types'
 
 const RELATIONSHIPS = [
   "Friend's Parents", "Sumner Teacher", "Family", "Friend", "Professor",
@@ -12,7 +13,12 @@ const ADDRESS_STATUSES = [
 
 const GIFT_FORMS = ["", "Online Donation", "Check", "Cash"]
 
-const BLANK_CONTACT = {
+type ContactFormState = Omit<Contact, 'id' | 'topPriority' | 'giftAmount' | 'createdAt' | 'updatedAt'> & {
+  topPriority: string
+  giftAmount: string
+}
+
+const BLANK_CONTACT: ContactFormState = {
   fullName: '', relationship: '', returning: false, topPriority: '',
   addressStatus: '', sent: false, letterAddressName: '', salutation: '',
   letterPrinted: false, mainEnvelopePrinted: false, thankYouSent: false,
@@ -22,7 +28,13 @@ const BLANK_CONTACT = {
   formOfGift: '', giftAmount: '', dateReceived: '',
 }
 
-function Toggle({ label, checked, onChange }) {
+interface ToggleProps {
+  label: string
+  checked: boolean
+  onChange: (val: boolean) => void
+}
+
+function Toggle({ label, checked, onChange }: ToggleProps) {
   return (
     <label className="flex items-center gap-2 cursor-pointer select-none">
       <div
@@ -36,7 +48,7 @@ function Toggle({ label, checked, onChange }) {
   )
 }
 
-function Field({ label, children }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
       <label className="label">{label}</label>
@@ -45,11 +57,22 @@ function Field({ label, children }) {
   )
 }
 
-export default function ContactModal({ contact, onSave, onDelete, onClose }) {
-  const isNew = !contact
-  const [form, setForm] = useState(contact ? { ...contact, giftAmount: contact.giftAmount || '' } : BLANK_CONTACT)
+interface Props {
+  contact: Contact | null
+  onSave: (data: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>) => void
+  onDelete: (id: string) => void
+  onClose: () => void
+}
 
-  function set(key, val) {
+export default function ContactModal({ contact, onSave, onDelete, onClose }: Props) {
+  const isNew = !contact
+  const [form, setForm] = useState<ContactFormState>(
+    contact
+      ? { ...contact, giftAmount: contact.giftAmount != null ? String(contact.giftAmount) : '', topPriority: contact.topPriority != null ? String(contact.topPriority) : '' }
+      : BLANK_CONTACT
+  )
+
+  function set<K extends keyof ContactFormState>(key: K, val: ContactFormState[K]) {
     setForm(f => ({ ...f, [key]: val }))
   }
 
@@ -62,7 +85,6 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }) {
   return (
     <div className="fixed inset-0 bg-stone-dark/40 flex items-start justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-modal w-full max-w-2xl my-8">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-cream-200">
           <h2 className="text-lg font-semibold text-stone-dark">
             {isNew ? 'Add Contact' : form.fullName || 'Edit Contact'}
@@ -71,7 +93,6 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }) {
         </div>
 
         <div className="px-6 py-5 space-y-5">
-          {/* Basic Info */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-warm mb-3">Contact Info</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -98,12 +119,11 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }) {
               </Field>
               <Field label="Top Priority (1=highest)">
                 <input className="input-field" type="number" min="1" max="3" placeholder="1–3 or blank"
-                  value={form.topPriority ?? ''} onChange={e => set('topPriority', e.target.value)} />
+                  value={form.topPriority} onChange={e => set('topPriority', e.target.value)} />
               </Field>
             </div>
           </section>
 
-          {/* Address */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-warm mb-3">Address</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -130,7 +150,6 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }) {
             </div>
           </section>
 
-          {/* Communication Flags */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-warm mb-3">Communication</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -143,7 +162,6 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }) {
             </div>
           </section>
 
-          {/* Partnership */}
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-warm mb-3">Partnership</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -171,7 +189,6 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }) {
             </div>
           </section>
 
-          {/* Notes */}
           <section>
             <Field label="Notes">
               <textarea
@@ -183,7 +200,6 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }) {
           </section>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-cream-200">
           <div>
             {!isNew && (

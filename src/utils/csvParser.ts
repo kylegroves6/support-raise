@@ -1,27 +1,28 @@
 import Papa from 'papaparse'
 import { v4 as uuidv4 } from 'uuid'
+import type { Contact } from '../types'
 
 const BOOL_TRUE = new Set(['yes', 'true', '1'])
 
-function parseBool(val) {
+function parseBool(val: string | undefined): boolean {
   if (!val) return false
   return BOOL_TRUE.has(String(val).trim().toLowerCase())
 }
 
-function parseGiftAmount(val) {
+function parseGiftAmount(val: string | undefined): number {
   if (!val) return 0
   const cleaned = String(val).replace(/[$,\s]/g, '')
   const n = parseFloat(cleaned)
   return isNaN(n) ? 0 : n
 }
 
-function parseInt2(val) {
+function parseIntVal(val: string | undefined): number | null {
   if (!val || String(val).trim() === '') return null
   const n = parseInt(String(val).trim(), 10)
   return isNaN(n) ? null : n
 }
 
-const COLUMN_MAP = {
+const COLUMN_MAP: Record<string, keyof Contact> = {
   'Full Name': 'fullName',
   'Relationship': 'relationship',
   'Returning': 'returning',
@@ -50,7 +51,7 @@ const COLUMN_MAP = {
   'Date Received': 'dateReceived',
 }
 
-const BOOL_FIELDS = new Set([
+const BOOL_FIELDS = new Set<keyof Contact>([
   'returning', 'sent', 'letterPrinted', 'mainEnvelopePrinted',
   'thankYouSent', 'callMade', 'financialPartner', 'prayerPartner',
   'pledgedToGive',
@@ -58,19 +59,32 @@ const BOOL_FIELDS = new Set([
 
 const COLUMN_MAP_INVERSE = Object.fromEntries(
   Object.entries(COLUMN_MAP).map(([csvCol, field]) => [field, csvCol])
-)
+) as Record<keyof Contact, string>
 
-export function exportCSV(contacts) {
+export interface ImportDiagnostics {
+  totalRows: number
+  imported: number
+  skipped: number
+  skippedRows: number[]
+  missingHeaders: string[]
+  unmappedHeaders: string[]
+  rowErrors: { row: number; col: string; val: string | undefined; error: string }[]
+  papaParseMeta: Papa.ParseMeta
+  papaParseErrors: Papa.ParseError[]
+}
+
+export function exportCSV(contacts: Contact[]): void {
   const rows = contacts.map(c => {
-    const row = {}
+    const row: Record<string, string> = {}
     for (const [field, csvCol] of Object.entries(COLUMN_MAP_INVERSE)) {
-      const val = c[field]
-      if (BOOL_FIELDS.has(field)) {
+      const key = field as keyof Contact
+      const val = c[key]
+      if (BOOL_FIELDS.has(key)) {
         row[csvCol] = val ? 'Yes' : 'No'
-      } else if (field === 'giftAmount') {
-        row[csvCol] = val != null ? val : ''
+      } else if (key === 'giftAmount') {
+        row[csvCol] = val != null ? String(val) : ''
       } else {
-        row[csvCol] = val ?? ''
+        row[csvCol] = val != null ? String(val) : ''
       }
     }
     return row
@@ -86,8 +100,8 @@ export function exportCSV(contacts) {
   URL.revokeObjectURL(url)
 }
 
-export function parseCSV(csvText) {
-  const result = Papa.parse(csvText, {
+export function parseCSV(csvText: string): { contacts: Contact[]; diagnostics: ImportDiagnostics } {
+  const result = Papa.parse<Record<string, string>>(csvText, {
     header: true,
     skipEmptyLines: true,
   })
@@ -98,28 +112,28 @@ export function parseCSV(csvText) {
   const unmappedHeaders = detectedHeaders.filter(h => !COLUMN_MAP[h])
 
   const rows = result.data
-  const contacts = []
-  const skippedRows = []
-  const rowErrors = []
+  const contacts: Contact[] = []
+  const skippedRows: number[] = []
+  const rowErrors: ImportDiagnostics['rowErrors'] = []
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
-    const mapped = {}
+    const mapped: Partial<Contact> = {}
 
     for (const [csvCol, field] of Object.entries(COLUMN_MAP)) {
       const val = row[csvCol]
       try {
         if (field === 'topPriority') {
-          mapped[field] = parseInt2(val)
+          mapped[field] = parseIntVal(val)
         } else if (field === 'giftAmount') {
           mapped[field] = parseGiftAmount(val)
         } else if (BOOL_FIELDS.has(field)) {
-          mapped[field] = parseBool(val)
+          (mapped as Record<string, boolean>)[field] = parseBool(val)
         } else {
-          mapped[field] = val ? String(val).trim() : ''
+          (mapped as Record<string, string>)[field] = val ? String(val).trim() : ''
         }
       } catch (err) {
-        rowErrors.push({ row: i + 2, col: csvCol, val, error: err.message })
+        rowErrors.push({ row: i + 2, col: csvCol, val, error: (err as Error).message })
       }
     }
 
@@ -128,7 +142,7 @@ export function parseCSV(csvText) {
       continue
     }
 
-    contacts.push({ id: uuidv4(), ...mapped })
+    contacts.push({ id: uuidv4(), ...mapped } as Contact)
   }
 
   return {

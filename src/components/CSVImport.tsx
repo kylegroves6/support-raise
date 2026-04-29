@@ -1,16 +1,22 @@
 import { useState, useRef } from 'react'
-import { parseCSV } from '../utils/csvParser'
+import { parseCSV, type ImportDiagnostics } from '../utils/csvParser'
+import type { Contact, ImportMode } from '../types'
 
-export default function CSVImport({ onImport, onClose }) {
-  const [preview, setPreview] = useState(null)
-  const [diagnostics, setDiagnostics] = useState(null)
-  const [error, setError] = useState(null)
-  const [mode, setMode] = useState('append')
+interface Props {
+  onImport: (contacts: Contact[], mode: ImportMode) => void
+  onClose: () => void
+}
+
+export default function CSVImport({ onImport, onClose }: Props) {
+  const [preview, setPreview] = useState<Contact[] | null>(null)
+  const [diagnostics, setDiagnostics] = useState<ImportDiagnostics | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [mode, setMode] = useState<ImportMode>('append')
   const [showDiag, setShowDiag] = useState(false)
-  const fileRef = useRef()
+  const fileRef = useRef<HTMLInputElement>(null)
 
-  function handleFile(e) {
-    const file = e.target.files[0]
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
     if (!file) return
     setError(null)
     setPreview(null)
@@ -20,7 +26,7 @@ export default function CSVImport({ onImport, onClose }) {
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const { contacts, diagnostics: diag } = parseCSV(ev.target.result)
+        const { contacts, diagnostics: diag } = parseCSV(ev.target?.result as string)
         setDiagnostics(diag)
 
         if (diag.papaParseErrors?.length > 0 && contacts.length === 0) {
@@ -40,7 +46,7 @@ export default function CSVImport({ onImport, onClose }) {
           setShowDiag(true)
         }
       } catch (err) {
-        setError(`Unexpected error: ${err.message}`)
+        setError(`Unexpected error: ${(err as Error).message}`)
       }
     }
     reader.onerror = () => setError('Could not read the file. Make sure it is a valid CSV.')
@@ -48,6 +54,7 @@ export default function CSVImport({ onImport, onClose }) {
   }
 
   function handleImport() {
+    if (!preview) return
     onImport(preview, mode)
     onClose()
   }
@@ -73,7 +80,7 @@ export default function CSVImport({ onImport, onClose }) {
 
           <div
             className="border-2 border-dashed border-cream-300 rounded-xl p-8 text-center cursor-pointer hover:border-sage-300 hover:bg-sage-50 transition-colors"
-            onClick={() => fileRef.current.click()}
+            onClick={() => fileRef.current?.click()}
           >
             <div className="text-3xl mb-2">📄</div>
             <p className="text-sm font-medium text-stone-dark">Click to select a CSV file</p>
@@ -95,7 +102,7 @@ export default function CSVImport({ onImport, onClose }) {
                   <div>
                     <p className={`text-sm font-medium ${hasWarnings ? 'text-amber-700' : 'text-sage-600'}`}>
                       {preview.length} contacts ready to import
-                      {diagnostics.skipped > 0 && ` (${diagnostics.skipped} rows skipped)`}
+                      {diagnostics && diagnostics.skipped > 0 && ` (${diagnostics.skipped} rows skipped)`}
                     </p>
                     <p className="text-xs text-stone-warm mt-0.5">
                       {preview.slice(0, 3).map(c => c.fullName).filter(Boolean).join(', ')}
@@ -129,7 +136,6 @@ export default function CSVImport({ onImport, onClose }) {
             </div>
           )}
 
-          {/* Diagnostics panel */}
           {diagnostics && showDiag && (
             <DiagnosticsPanel diagnostics={diagnostics} />
           )}
@@ -150,7 +156,7 @@ export default function CSVImport({ onImport, onClose }) {
   )
 }
 
-function DiagnosticsPanel({ diagnostics: d }) {
+function DiagnosticsPanel({ diagnostics: d }: { diagnostics: ImportDiagnostics }) {
   return (
     <div className="bg-stone-50 border border-stone-200 rounded-lg p-4 space-y-3 text-xs font-mono">
       <p className="font-sans font-semibold text-stone-dark text-sm">Import Diagnostics</p>
