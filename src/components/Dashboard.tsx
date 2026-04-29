@@ -92,7 +92,7 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
 
   const lists = useMemo(() => {
     const needFollowUp = contacts.filter(
-      c => c.sent && !c.callMade && !c.financialPartner
+      c => c.sent && !c.callMade && !c.financialPartner && !c.responded
     )
     const pledgedFollowUp = needFollowUp.filter(c => c.pledgedToGive)
     const nonPledgedFollowUp = needFollowUp.filter(c => !c.pledgedToGive)

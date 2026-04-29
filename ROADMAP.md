@@ -55,6 +55,7 @@ CREATE TABLE contacts (
   form_of_gift          TEXT,
   gift_amount           NUMERIC(10,2),
   date_received         TEXT,
+  responded             BOOLEAN NOT NULL DEFAULT false,
   created_at            TIMESTAMPTZ DEFAULT now(),
   updated_at            TIMESTAMPTZ DEFAULT now()
 );
@@ -98,6 +99,56 @@ supabase db query --linked "ALTER TABLE contacts ADD COLUMN ..."
 supabase migration new <name>
 supabase db push
 ```
+
+---
+
+## Phase 1.5 — Activity heatmap (near-term)
+
+A GitHub-style heatmap showing outreach activity over time — how consistently you're reaching out, sending letters, following up, and logging donations.
+
+### What it tracks
+Each square represents one day. Color intensity reflects how many outreach events happened that day across tracked categories:
+- **Letter sent** (`sent` flipped to true)
+- **Follow-up made** (`call_made` flipped to true)
+- **Gift received** (`financial_partner` or `gift_amount > 0` recorded)
+- **Contact added** (`created_at`)
+- **Thank-you sent** (`thank_you_sent` flipped to true)
+
+### Data model
+This requires an `activity_log` table — a new row each time a meaningful field changes on a contact. The contacts table's `updated_at` only tells you *something* changed, not *what*. Options:
+
+1. **App-level logging (simplest):** Write to `activity_log` explicitly in `useContacts.ts` whenever a relevant field is saved. No DB triggers needed.
+2. **Postgres trigger (more robust):** A trigger on `contacts` compares OLD vs NEW for each tracked field and inserts log rows automatically.
+
+Recommended: start with option 1. Migrate to triggers if a second platform (e.g., mobile) is added.
+
+```sql
+CREATE TABLE activity_log (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  contact_id  UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  event_type  TEXT NOT NULL, -- 'sent', 'follow_up', 'gift', 'contact_added', 'thank_you'
+  occurred_at DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users see own activity" ON activity_log
+  FOR ALL USING (auth.uid() = user_id);
+```
+
+### UI
+- Placed on the Dashboard above or below the goal progress bar
+- 52-week rolling window (one year back from today)
+- Color ramp: cream (0) → sage-200 → sage-400 → sage-600 (4+)
+- Hover tooltip: date + count + breakdown by category
+- Optional toggle to filter by event type (letters only, follow-ups only, etc.)
+- No external charting lib needed — render as a CSS grid of `<div>` squares
+
+### What it tells you
+- Are you going in streaks and then going dark for weeks?
+- Which weeks had the most outreach?
+- Did you follow up promptly after sending letters?
 
 ---
 

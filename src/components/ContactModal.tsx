@@ -79,7 +79,8 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
   function handleSave() {
     const giftAmount = form.giftAmount === '' ? 0 : parseFloat(String(form.giftAmount).replace(/[$,]/g, '')) || 0
     const topPriority = form.topPriority === '' ? null : parseInt(form.topPriority, 10)
-    onSave({ ...form, giftAmount, topPriority })
+    const responded = form.responded || form.financialPartner || form.prayerPartner || giftAmount > 0
+    onSave({ ...form, giftAmount, topPriority, responded })
   }
 
   return (
