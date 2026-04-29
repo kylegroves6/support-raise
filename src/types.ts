@@ -20,6 +20,7 @@ export interface Contact {
   phone: string
   callMade: boolean
   email: string
+  responded: boolean
   financialPartner: boolean
   prayerPartner: boolean
   pledgedToGive: boolean

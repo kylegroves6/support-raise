@@ -24,7 +24,7 @@ const BLANK_CONTACT: ContactFormState = {
   letterPrinted: false, mainEnvelopePrinted: false, thankYouSent: false,
   notes: '', streetAddress: '', city: '', state: '', zip: '',
   concatenatedAddress: '', phone: '', callMade: false, email: '',
-  financialPartner: false, prayerPartner: false, pledgedToGive: false,
+  responded: false, financialPartner: false, prayerPartner: false, pledgedToGive: false,
   formOfGift: '', giftAmount: '', dateReceived: '',
 }
 
@@ -157,7 +157,7 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
               <Toggle label="Sent" checked={form.sent} onChange={v => set('sent', v)} />
               <Toggle label="Letter Printed" checked={form.letterPrinted} onChange={v => set('letterPrinted', v)} />
               <Toggle label="Envelope Printed" checked={form.mainEnvelopePrinted} onChange={v => set('mainEnvelopePrinted', v)} />
-              <Toggle label="Call Made" checked={form.callMade} onChange={v => set('callMade', v)} />
+              <Toggle label="Followed Up" checked={form.callMade} onChange={v => set('callMade', v)} />
               <Toggle label="Thank-You Sent" checked={form.thankYouSent} onChange={v => set('thankYouSent', v)} />
             </div>
           </section>
@@ -165,10 +165,14 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-warm mb-3">Partnership</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <Toggle label="Responded" checked={form.responded} onChange={v => set('responded', v)} />
               <Toggle label="Financial Partner" checked={form.financialPartner} onChange={v => set('financialPartner', v)} />
               <Toggle label="Prayer Partner" checked={form.prayerPartner} onChange={v => set('prayerPartner', v)} />
               <Toggle label="Pledged to Give" checked={form.pledgedToGive} onChange={v => set('pledgedToGive', v)} />
             </div>
+            <p className="text-xs text-stone-warm mt-2">
+              Mark <strong>Responded</strong> once you've heard back. Use <strong>Prayer Partner</strong> or <strong>Financial Partner</strong> to record their decision. Prayer-only means they're supportive but not giving financially.
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
               <Field label="Form of Gift">
                 <select className="input-field" value={form.formOfGift} onChange={e => set('formOfGift', e.target.value)}>

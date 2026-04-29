@@ -68,9 +68,10 @@ interface Props {
   onEdit: (contact: Contact) => void
   onAdd: () => void
   onImport: () => void
+  onDeleteAll: () => void
 }
 
-export default function ContactsTable({ contacts, onEdit, onAdd, onImport }: Props) {
+export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDeleteAll }: Props) {
   function handleExport() {
     exportCSV(contacts)
   }
@@ -181,9 +182,9 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport }: Pro
           </select>
 
           <select className="input-field w-auto text-xs py-1" value={filters.callMade} onChange={e => setFilter('callMade', e.target.value)}>
-            <option value="">Called?</option>
-            <option value="true">Called</option>
-            <option value="false">Not Called</option>
+            <option value="">Followed Up?</option>
+            <option value="true">Followed Up</option>
+            <option value="false">Not Followed Up</option>
           </select>
 
           <select className="input-field w-auto text-xs py-1" value={filters.financialPartner} onChange={e => setFilter('financialPartner', e.target.value)}>
@@ -199,6 +200,16 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport }: Pro
           )}
 
           <span className="ml-auto text-xs text-stone-warm">{filtered.length} contacts</span>
+
+          {contacts.length > 0 && (
+            <button
+              className="text-xs text-stone-light hover:text-red-500 transition-colors"
+              onClick={onDeleteAll}
+              title="Delete all contacts"
+            >
+              Delete all
+            </button>
+          )}
         </div>
       </div>
 
@@ -250,7 +261,8 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport }: Pro
                     <td className="px-3 py-2.5 min-w-[140px]">
                       <div className="flex flex-wrap gap-1">
                         {c.sent && <Chip label="Sent" color="blue" />}
-                        {c.callMade && <Chip label="Called" color="green" />}
+                        {c.callMade && <Chip label="Followed Up" color="green" />}
+                        {c.responded && !c.financialPartner && !c.prayerPartner && <Chip label="Responded" color="amber" />}
                         {c.financialPartner && <Chip label="Partner" color="green" />}
                         {c.prayerPartner && <Chip label="Prayer" color="cream" />}
                         {c.pledgedToGive && !c.financialPartner && <Chip label="Pledged" color="amber" />}

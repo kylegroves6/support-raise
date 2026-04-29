@@ -23,6 +23,7 @@ const CAMEL_TO_SNAKE: Record<keyof Omit<Contact, 'id' | 'createdAt' | 'updatedAt
   phone: 'phone',
   callMade: 'call_made',
   email: 'email',
+  responded: 'responded',
   financialPartner: 'financial_partner',
   prayerPartner: 'prayer_partner',
   pledgedToGive: 'pledged_to_give',
@@ -69,13 +70,21 @@ export function useContacts() {
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    supabase
-      .from('contacts')
-      .select('*')
-      .order('created_at', { ascending: true })
+    getCurrentUserId()
+      .then(userId =>
+        supabase
+          .from('contacts')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true })
+      )
       .then(({ data, error }) => {
         if (error) setError(error)
         else setContacts((data as DbRow[]).map(fromRow))
+        setLoading(false)
+      })
+      .catch(err => {
+        setError(err)
         setLoading(false)
       })
   }, [])
@@ -114,23 +123,25 @@ export function useContacts() {
 
   const importContacts = useCallback(async (incoming: Contact[]): Promise<void> => {
     const userId = await getCurrentUserId()
-    const rows = incoming.map(c => toRow(c, userId))
-    const { data, error } = await supabase
+    const { data: existing } = await supabase
       .from('contacts')
-      .upsert(rows, { onConflict: 'id', ignoreDuplicates: true })
-      .select()
+      .select('full_name')
+      .eq('user_id', userId)
+    const existingNames = new Set(
+      (existing as DbRow[] | null ?? []).map(r => String(r['full_name'] ?? '').toLowerCase())
+    )
+    const newOnes = incoming.filter(c => !existingNames.has((c.fullName ?? '').toLowerCase()))
+    if (newOnes.length === 0) return
+    const rows = newOnes.map(c => toRow(c, userId))
+    const { data, error } = await supabase.from('contacts').insert(rows).select()
     if (error) throw error
     const imported = (data as DbRow[]).map(fromRow)
-    setContacts(prev => {
-      const existingIds = new Set(prev.map(c => c.id))
-      const newOnes = imported.filter(c => !existingIds.has(c.id))
-      return [...prev, ...newOnes]
-    })
+    setContacts(prev => [...prev, ...imported])
   }, [])
 
   const replaceAll = useCallback(async (incoming: Contact[]): Promise<void> => {
     const userId = await getCurrentUserId()
-    const { error: delError } = await supabase.from('contacts').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    const { error: delError } = await supabase.from('contacts').delete().eq('user_id', userId)
     if (delError) throw delError
     const rows = incoming.map(c => toRow(c, userId))
     const { data, error } = await supabase.from('contacts').insert(rows).select()
@@ -138,5 +149,12 @@ export function useContacts() {
     setContacts((data as DbRow[]).map(fromRow))
   }, [])
 
-  return { contacts, loading, error, addContact, updateContact, deleteContact, importContacts, replaceAll }
+  const deleteAll = useCallback(async (): Promise<void> => {
+    const userId = await getCurrentUserId()
+    const { error } = await supabase.from('contacts').delete().eq('user_id', userId)
+    if (error) throw error
+    setContacts([])
+  }, [])
+
+  return { contacts, loading, error, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll }
 }

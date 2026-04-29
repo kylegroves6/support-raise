@@ -41,6 +41,7 @@ const COLUMN_MAP: Record<string, keyof Contact> = {
   'Zip': 'zip',
   'Concatenated Address': 'concatenatedAddress',
   'Phone': 'phone',
+  'Followed Up?': 'callMade',
   'Call Made?': 'callMade',
   'Email Address': 'email',
   'Financial Partner': 'financialPartner',
@@ -53,7 +54,7 @@ const COLUMN_MAP: Record<string, keyof Contact> = {
 
 const BOOL_FIELDS = new Set<keyof Contact>([
   'returning', 'sent', 'letterPrinted', 'mainEnvelopePrinted',
-  'thankYouSent', 'callMade', 'financialPartner', 'prayerPartner',
+  'thankYouSent', 'callMade', 'responded', 'financialPartner', 'prayerPartner',
   'pledgedToGive',
 ])
 

@@ -23,7 +23,7 @@ export default function App() {
 }
 
 function AuthenticatedApp() {
-  const { contacts, addContact, updateContact, deleteContact, importContacts, replaceAll } = useContacts()
+  const { contacts, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll } = useContacts()
   const { goals, totalGoal, updateGoals } = useGoalSettings()
 
   const [tab, setTab] = useState<Tab>('Dashboard')
@@ -122,7 +122,7 @@ function AuthenticatedApp() {
             goals={goals}
             totalGoal={totalGoal}
             onUpdateGoals={updateGoals}
-            onEditContact={(c) => { handleEditContact(c); setTab('Contacts') }}
+            onEditContact={handleEditContact}
           />
         )}
         {tab === 'Contacts' && (
@@ -131,6 +131,10 @@ function AuthenticatedApp() {
             onEdit={handleEditContact}
             onAdd={() => setAddingContact(true)}
             onImport={() => setShowImport(true)}
+            onDeleteAll={async () => {
+              if (!confirm(`Delete all ${contacts.length} contacts? This cannot be undone.`)) return
+              try { await deleteAll() } catch (err) { alert(`Failed: ${(err as Error).message}`) }
+            }}
           />
         )}
       </main>
