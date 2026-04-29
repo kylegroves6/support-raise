@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { exportCSV } from '../utils/csvParser'
 import type { Contact } from '../types'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const RELATIONSHIPS = [
   "Friend's Parents", "Sumner Teacher", "Family", "Friend", "Professor",
@@ -60,7 +61,7 @@ interface Filters {
   addressStatus: string
   sent: string
   callMade: string
-  financialPartner: string
+  partner: '' | 'financial' | 'prayer' | 'none'
 }
 
 interface Props {
@@ -81,7 +82,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
     addressStatus: '',
     sent: '',
     callMade: '',
-    financialPartner: '',
+    partner: '',
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'fullName', dir: 'asc' })
   const [page, setPage] = useState(1)
@@ -117,7 +118,9 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
     if (filters.addressStatus) rows = rows.filter(c => c.addressStatus === filters.addressStatus)
     if (filters.sent !== '') rows = rows.filter(c => c.sent === (filters.sent === 'true'))
     if (filters.callMade !== '') rows = rows.filter(c => c.callMade === (filters.callMade === 'true'))
-    if (filters.financialPartner !== '') rows = rows.filter(c => c.financialPartner === (filters.financialPartner === 'true'))
+    if (filters.partner === 'financial') rows = rows.filter(c => c.financialPartner)
+    if (filters.partner === 'prayer') rows = rows.filter(c => c.prayerPartner && !c.financialPartner)
+    if (filters.partner === 'none') rows = rows.filter(c => !c.financialPartner && !c.prayerPartner)
 
     rows = [...rows].sort((a, b) => {
       let va: string | number | boolean | null | undefined = a[sort.field]
@@ -140,7 +143,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
   const activeFilters = Object.values(filters).filter(Boolean).length
 
   function clearFilters() {
-    setFilters({ relationship: '', addressStatus: '', sent: '', callMade: '', financialPartner: '' })
+    setFilters({ relationship: '', addressStatus: '', sent: '', callMade: '', partner: '' })
     setSearch('')
     setPage(1)
   }
@@ -165,33 +168,59 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
         <div className="flex flex-wrap gap-2 items-center">
           <span className="text-xs font-medium text-stone-warm">Filter:</span>
 
-          <select className="input-field w-auto text-xs py-1" value={filters.relationship} onChange={e => setFilter('relationship', e.target.value)}>
-            <option value="">All Relationships</option>
-            {RELATIONSHIPS.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
+          <Select value={filters.relationship} onValueChange={v => setFilter('relationship', v === '__all__' ? '' : v)}>
+            <SelectTrigger className="w-auto min-w-[140px] h-8 text-xs">
+              <SelectValue placeholder="All Relationships" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Relationships</SelectItem>
+              {RELATIONSHIPS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+            </SelectContent>
+          </Select>
 
-          <select className="input-field w-auto text-xs py-1" value={filters.addressStatus} onChange={e => setFilter('addressStatus', e.target.value)}>
-            <option value="">All Address Status</option>
-            {ADDRESS_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+          <Select value={filters.addressStatus} onValueChange={v => setFilter('addressStatus', v === '__all__' ? '' : v)}>
+            <SelectTrigger className="w-auto min-w-[140px] h-8 text-xs">
+              <SelectValue placeholder="All Address Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Address Status</SelectItem>
+              {ADDRESS_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
 
-          <select className="input-field w-auto text-xs py-1" value={filters.sent} onChange={e => setFilter('sent', e.target.value)}>
-            <option value="">Sent?</option>
-            <option value="true">Sent</option>
-            <option value="false">Not Sent</option>
-          </select>
+          <Select value={filters.sent} onValueChange={v => setFilter('sent', v === '__all__' ? '' : v)}>
+            <SelectTrigger className="w-auto min-w-[110px] h-8 text-xs">
+              <SelectValue placeholder="Sent?" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Any</SelectItem>
+              <SelectItem value="true">Sent</SelectItem>
+              <SelectItem value="false">Not Sent</SelectItem>
+            </SelectContent>
+          </Select>
 
-          <select className="input-field w-auto text-xs py-1" value={filters.callMade} onChange={e => setFilter('callMade', e.target.value)}>
-            <option value="">Followed Up?</option>
-            <option value="true">Followed Up</option>
-            <option value="false">Not Followed Up</option>
-          </select>
+          <Select value={filters.callMade} onValueChange={v => setFilter('callMade', v === '__all__' ? '' : v)}>
+            <SelectTrigger className="w-auto min-w-[130px] h-8 text-xs">
+              <SelectValue placeholder="Followed Up?" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Any</SelectItem>
+              <SelectItem value="true">Followed Up</SelectItem>
+              <SelectItem value="false">Not Followed Up</SelectItem>
+            </SelectContent>
+          </Select>
 
-          <select className="input-field w-auto text-xs py-1" value={filters.financialPartner} onChange={e => setFilter('financialPartner', e.target.value)}>
-            <option value="">Partner?</option>
-            <option value="true">Partner</option>
-            <option value="false">Not Partner</option>
-          </select>
+          <Select value={filters.partner} onValueChange={v => setFilter('partner', v === '__all__' ? '' : v as Filters['partner'])}>
+            <SelectTrigger className="w-auto min-w-[150px] h-8 text-xs">
+              <SelectValue placeholder="Partner Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Any Partner Status</SelectItem>
+              <SelectItem value="financial">Financial Partner</SelectItem>
+              <SelectItem value="prayer">Prayer Partner Only</SelectItem>
+              <SelectItem value="none">No Partner</SelectItem>
+            </SelectContent>
+          </Select>
 
           {(activeFilters > 0 || search) && (
             <button className="text-xs text-red-400 hover:text-red-600 transition-colors" onClick={clearFilters}>

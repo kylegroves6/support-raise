@@ -3,6 +3,31 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 20 14% 26%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 14% 26%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 14% 26%;
+    --primary: 120 22% 41%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 60% 95%;
+    --secondary-foreground: 20 14% 26%;
+    --muted: 40 30% 94%;
+    --muted-foreground: 25 20% 55%;
+    --accent: 40 30% 94%;
+    --accent-foreground: 20 14% 26%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 40 30% 88%;
+    --input: 40 30% 88%;
+    --ring: 120 22% 41%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
   body {
     @apply bg-cream-100 text-stone-dark font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
