@@ -1,19 +1,22 @@
 # Support Raising Tracker — Roadmap
 
-## Current State (v0.4 — April 2026)
-- Vite + React + Tailwind SPA
-- Supabase for database, auth, and RLS
+## Current State (v0.5 — April 2026)
+
+- Vite + React + TypeScript + Tailwind SPA
+- Supabase for database (Postgres), auth, and RLS
 - No server-side component — Supabase JS client called directly from React hooks
+- Supabase CLI linked for migrations (`supabase db push`, `supabase db query --linked`)
 
 ---
 
-## Phase 1 — Supabase ✓ complete
+## Phase 1 — Complete ✓
 
 ### Stack
-- **Database:** Supabase cloud Postgres (free tier)
-- **API layer:** `@supabase/supabase-js` client called directly from React hooks
+- **Database:** Supabase cloud Postgres
 - **Auth:** Supabase Auth (email/password)
-- **RLS:** Row-level security so users only see their own data
+- **API layer:** `@supabase/supabase-js` called directly from React hooks
+- **RLS:** Row-level security — users only see their own data
+- **Types:** Full TypeScript — shared `Contact` and `Goals` interfaces in `src/types.ts`
 
 ### Env vars (`.env`)
 ```
@@ -21,9 +24,8 @@ VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_ANON_KEY=<publishable-key>
 ```
 
-### Schema (already applied in Supabase SQL editor)
+### Live schema (as applied)
 ```sql
--- contacts
 CREATE TABLE contacts (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id               UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -43,6 +45,7 @@ CREATE TABLE contacts (
   city                  TEXT,
   state                 TEXT,
   zip                   TEXT,
+  concatenated_address  TEXT,
   phone                 TEXT,
   call_made             BOOLEAN NOT NULL DEFAULT false,
   email                 TEXT,
@@ -56,7 +59,6 @@ CREATE TABLE contacts (
   updated_at            TIMESTAMPTZ DEFAULT now()
 );
 
--- goals (one row per user)
 CREATE TABLE goals (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id            UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -66,7 +68,6 @@ CREATE TABLE goals (
   updated_at         TIMESTAMPTZ DEFAULT now()
 );
 
--- RLS
 ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE goals    ENABLE ROW LEVEL SECURITY;
 
@@ -76,26 +77,33 @@ CREATE POLICY "users see own contacts" ON contacts
 CREATE POLICY "users see own goals" ON goals
   FOR ALL USING (auth.uid() = user_id);
 
--- auto-update updated_at
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN NEW.updated_at = now(); RETURN NEW; END;
 $$;
 
 CREATE TRIGGER contacts_updated_at
-  BEFORE UPDATE ON contacts
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  BEFORE UPDATE ON contacts FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TRIGGER goals_updated_at
-  BEFORE UPDATE ON goals
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  BEFORE UPDATE ON goals FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+```
+
+### Running migrations
+```bash
+# One-off query
+supabase db query --linked "ALTER TABLE contacts ADD COLUMN ..."
+
+# Migration file workflow
+supabase migration new <name>
+supabase db push
 ```
 
 ---
 
-## Phase 2 — AI writing assistant (priority: future)
+## Phase 2 — AI writing assistant (future)
 
-Draft emails, call scripts, texts, and support letters based on contact data.
+Draft emails, call scripts, and thank-you notes based on contact data.
 
 - Claude API via a Supabase Edge Function (keeps API key server-side)
 - Inputs: contact name, relationship, stage, notes
@@ -105,7 +113,7 @@ Draft emails, call scripts, texts, and support letters based on contact data.
 
 ---
 
-## Phase 3 — SaaS / multi-user (priority: future)
+## Phase 3 — SaaS / multi-user (future)
 
 If this becomes a product for other missionaries:
 - Supabase Auth already handles sign-up/login
@@ -113,12 +121,15 @@ If this becomes a product for other missionaries:
 - Stripe for billing
 - `organization_id` for team use (mission agency managing multiple raisers)
 - Make project name user-configurable (currently hardcoded "Tokyo Mission")
+- Reconsider Next.js at this point for SSR and API routes
 
 ---
 
-## Decisions made
-- **Skipped local Docker phase** — went directly to Supabase since no real data existed yet
-- **Keeping Vite** — right fit for personal use; only reconsider Next.js if Phase 3 SaaS happens
-- **Supabase URL + publishable key are not secrets** — go in `.env` directly, not Secrets Manager
-- **Bitwarden Secrets Manager** — reserved for future server-side secrets (e.g. Anthropic API key in Phase 2 Edge Function)
-- **AI assistance** deferred until Phase 2
+## Decisions log
+- **Skipped Docker/Express entirely** — went straight to Supabase since no real data existed
+- **Keeping Vite** — right fit for personal use; reconsider Next.js only at Phase 3
+- **TypeScript** — migrated from JS in April 2026; shared `Contact`/`Goals` types catch schema mismatches at compile time
+- **Supabase URL + publishable key are not secrets** — go in `.env` directly
+- **Bitwarden Secrets Manager** — reserved for future server-side secrets (Phase 2 Anthropic API key)
+- **`returning` is a Postgres reserved word** — must be quoted as `"returning"` in SQL
+- **camelCase ↔ snake_case mapping** lives in `useContacts.ts` (`CAMEL_TO_SNAKE` / `fromRow` / `toRow`)

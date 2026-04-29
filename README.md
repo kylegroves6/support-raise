@@ -1,183 +1,88 @@
 # Tokyo Mission — Support Raising Tracker
 
-A personal support-tracking app for missionaries. Contacts, pledge status, mailing workflow, and fundraising goals — all in one place.
+A personal support-tracking app for missionaries. Manage contacts, pledge status, mailing workflow, and fundraising goals — all in one place.
 
-**Stack:** Vite + React + Tailwind (frontend) · Express + Node (API) · Postgres 16 (database) · Docker Compose
+**Stack:** Vite + React + TypeScript + Tailwind · Supabase (Postgres, Auth, RLS)
 
 ---
 
 ## Prerequisites
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes `docker compose`)
-- Node.js 22+ (for running migrations and seed scripts outside Docker)
-- `openssl` (for generating secrets — available on macOS/Linux by default)
-- Optional: [Bitwarden Secrets Manager CLI (`bws`)](https://bitwarden.com/help/secrets-manager-cli/) if using Bitwarden instead of a `.env` file
+- Node.js 22+
+- A Supabase account and project ([supabase.com](https://supabase.com))
+- Supabase CLI (`brew install supabase/tap/supabase`) — for running migrations
 
 ---
 
 ## First-time setup
 
-### Option A — `.env` file (simplest)
+**1. Clone the repo and install dependencies:**
+```bash
+npm install
+```
 
-**1. Copy the env template:**
+**2. Copy the env template and fill in your Supabase project values:**
 ```bash
 cp .env.example .env
 ```
+Find your values in the Supabase dashboard under **Settings → API**:
+```
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<publishable anon key>
+```
+These are safe to expose client-side — they are not secrets.
 
-**2. Generate secret values:**
+**3. Apply the database schema:**
+
+Link the CLI to your project (one-time):
 ```bash
-openssl rand -hex 32   # run twice — once for POSTGRES_PASSWORD, once for API_KEY
+supabase link --project-ref <project-ref>
 ```
 
-**3. Fill in `.env`:**
-```
-POSTGRES_PASSWORD=<generated value>
-API_KEY=<generated value>
-VITE_API_KEY=<same value as API_KEY>
-LOCAL_USER_EMAIL=local@localhost
-LOCAL_USER_ID=   # fill in after step 6
-```
-
-**4. Start Postgres only:**
+Run the migration:
 ```bash
-docker compose up -d db
+supabase db push
 ```
 
-**5. Run the database migration (creates all tables):**
+**4. Start the dev server:**
 ```bash
-DATABASE_URL=postgres://postgres:<POSTGRES_PASSWORD>@localhost:5432/support_raising \
-  node api/migrate.js
+npm run dev
 ```
-
-**6. Seed your contacts from a CSV export:**
-```bash
-DATABASE_URL=postgres://postgres:<POSTGRES_PASSWORD>@localhost:5432/support_raising \
-  node api/seed.js /path/to/contacts-export.csv
-```
-
-**7. Get the user UUID that was created:**
-```bash
-docker compose exec db psql -U postgres support_raising -c "SELECT id FROM users;"
-```
-Paste the UUID into `LOCAL_USER_ID=` in your `.env`.
-
-**8. Start everything:**
-```bash
-docker compose up
-```
-
-App: http://localhost:5173  
-API: http://localhost:3001
+App runs at http://localhost:5173. Sign up for an account on first visit.
 
 ---
 
-### Option B — Bitwarden Secrets Manager (recommended for production or shared machines)
+## Daily use
 
-Bitwarden Secrets Manager stores secrets in your Bitwarden vault and injects them as environment variables at runtime. Nothing sensitive ever lives in a file on disk.
-
-**How it works:** The `bws run` command authenticates with a machine account access token (the one non-sensitive value you still need locally), fetches all secrets from your Bitwarden project, injects them as environment variables, then runs your command. The secret *values* never touch the filesystem.
-
-**Setup:**
-
-1. Install the `bws` CLI:
-   ```bash
-   # macOS
-   brew install bitwarden/tap/bws
-
-   # Or download from https://github.com/bitwarden/sdk-sm/releases
-   ```
-
-2. In Bitwarden Secrets Manager, create a project called `support-raising` and add these secrets with exactly these key names:
-   ```
-   POSTGRES_PASSWORD
-   API_KEY
-   VITE_API_KEY        (same value as API_KEY)
-   LOCAL_USER_EMAIL    (e.g. local@localhost)
-   LOCAL_USER_ID       (the UUID from step 7 above — fill in after first migration)
-   ```
-
-3. Create a machine account, grant it read access to the `support-raising` project, and copy its access token.
-
-4. Export only the access token to your shell (the only value that needs to be local):
-   ```bash
-   export BWS_ACCESS_TOKEN=<your-machine-account-access-token>
-   ```
-   Add that line to your `~/.zshrc` or `~/.zprofile` so it persists across sessions.
-
-5. Run migration and seed with secrets injected by `bws`:
-   ```bash
-   bws run -- node api/migrate.js
-   bws run -- node api/seed.js /path/to/contacts-export.csv
-   ```
-
-6. Start the API with secrets injected:
-   ```bash
-   bws run -- node api/server.js
-   ```
-
-7. For the Vite frontend in dev, `VITE_API_KEY` must be present when Vite starts:
-   ```bash
-   bws run -- npm run dev
-   ```
-
-8. For Docker Compose with Bitwarden, pass secrets at startup:
-   ```bash
-   bws run -- docker compose up
-   ```
-   Docker Compose automatically reads environment variables from the shell that launched it, so all `${VAR}` references in `docker-compose.yml` will resolve from the injected secrets.
-
-**One-liner to start everything with Bitwarden:**
 ```bash
-bws run -- docker compose up
+npm run dev
 ```
 
 ---
 
-## Daily use (after first-time setup)
+## Importing contacts
 
-```bash
-# With .env file:
-docker compose up
+Use **Contacts → Import CSV** to bulk-load contacts from a Google Sheet export. Column headers must match exactly (see `src/utils/csvParser.ts` for the full mapping). Two modes:
 
-# With Bitwarden Secrets Manager:
-bws run -- docker compose up
-```
-
-Stop everything:
-```bash
-docker compose down
-```
-
-Stop and delete all data (destructive — you'll need to re-seed):
-```bash
-docker compose down -v
-```
+- **Append** — adds new contacts, leaves existing ones alone
+- **Replace all** — wipes existing contacts and loads the CSV fresh
 
 ---
 
 ## Database migrations
 
-If the schema changes in the future, new migration files will appear in `api/migrations/`. Run them in order:
-```bash
-# With .env:
-node api/migrate.js
+Schema changes are managed with the Supabase CLI. To apply a new migration:
 
-# With Bitwarden:
-bws run -- node api/migrate.js
+```bash
+supabase db query --linked "ALTER TABLE contacts ADD COLUMN ..."
 ```
 
----
-
-## Re-seeding from a CSV export
-
-If you need to restore data from a CSV (e.g. on a new machine), export from the app first (Contacts tab → Export CSV), then:
+Or create a migration file and push:
 ```bash
-node api/seed.js /path/to/contacts-export.csv
-# or
-bws run -- node api/seed.js /path/to/contacts-export.csv
+supabase migration new <name>
+# edit supabase/migrations/<timestamp>_<name>.sql
+supabase db push
 ```
-
-The seed script uses `ON CONFLICT DO NOTHING` so it's safe to run against a DB that already has data — it won't create duplicates.
 
 ---
 
@@ -185,38 +90,39 @@ The seed script uses `ON CONFLICT DO NOTHING` so it's safe to run against a DB t
 
 ```
 .
-├── api/
-│   ├── migrations/
-│   │   └── 001_init.sql      # Database schema (RLS-ready, user_id on all tables)
-│   ├── db.js                 # Postgres connection pool
-│   ├── migrate.js            # Schema runner
-│   ├── seed.js               # CSV → Postgres importer
-│   ├── server.js             # Express API (contacts CRUD, goals upsert)
-│   ├── Dockerfile
-│   └── package.json
 ├── src/
-│   ├── components/           # React UI components
+│   ├── App.tsx                   # Root — auth gate + layout
+│   ├── types.ts                  # Shared Contact and Goals interfaces
+│   ├── components/
+│   │   ├── Dashboard.tsx         # Progress, stats, action lists
+│   │   ├── ContactsTable.tsx     # Filterable, sortable contact list
+│   │   ├── ContactModal.tsx      # Add / edit contact form
+│   │   ├── CSVImport.tsx         # Import modal with diagnostics
+│   │   ├── GoalSettings.tsx      # Trip cost / goal editor
+│   │   └── LoginPage.tsx         # Supabase Auth sign-in / sign-up
 │   ├── hooks/
-│   │   ├── useContacts.js    # Fetches from /api/contacts
-│   │   └── useGoalSettings.js# Fetches from /api/goals
+│   │   ├── useContacts.ts        # Supabase CRUD + camelCase↔snake_case mapping
+│   │   └── useGoalSettings.ts    # Goals upsert
+│   ├── lib/
+│   │   ├── supabase.ts           # Supabase client
+│   │   └── AuthContext.tsx       # Session provider
 │   └── utils/
-│       └── csvParser.js      # CSV import/export logic
-├── docker-compose.yml
-├── vite.config.js            # Proxies /api → localhost:3001 in dev
-├── .env.example              # Secrets template — copy to .env
-└── ROADMAP.md                # Architecture decisions and future phases
+│       └── csvParser.ts          # CSV import / export logic
+├── supabase/                     # Supabase CLI config (linked project)
+├── .env.example                  # Env template — copy to .env
+├── tsconfig.json
+├── vite.config.ts
+└── ROADMAP.md                    # Architecture decisions and future phases
 ```
 
 ---
 
 ## Moving to a new machine
 
-1. Clone or copy the repo (no database files — `data/` is gitignored)
-2. Install Docker Desktop and Node.js
-3. Follow **First-time setup** above — Option A or B
-4. Bring your CSV export to seed the database
-
-Your data is now in `./data/postgres/` (a Docker volume mount). Back that directory up separately if you want a binary backup in addition to CSV exports.
+1. Clone the repo
+2. `npm install`
+3. Copy `.env.example` → `.env` and fill in your Supabase credentials
+4. `npm run dev` — data is in Supabase, nothing to migrate locally
 
 ---
 
@@ -224,7 +130,5 @@ Your data is now in `./data/postgres/` (a Docker volume mount). Back that direct
 
 | Phase | What |
 |-------|------|
-| 2 | Row-Level Security already in schema — `user_id` on every table |
-| 3 | Supabase migration — swap Express for Supabase client, enable RLS policies, add auth |
-| 4 | AI writing assistant via Claude API (needs Phase 3 first for server-side key handling) |
-| 5 | SaaS / multi-user — `user_roles` table already in schema |
+| 2 | AI writing assistant — email drafts, call scripts, thank-you notes via Claude API + Supabase Edge Function |
+| 3 | SaaS / multi-user — Stripe billing, org-level isolation, configurable project name |

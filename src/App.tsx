@@ -35,26 +35,38 @@ function AuthenticatedApp() {
     setEditingContact(contact)
   }
 
-  function handleSaveContact(data: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>) {
-    if (editingContact) {
-      updateContact(editingContact.id, data)
-    } else {
-      addContact(data)
+  async function handleSaveContact(data: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>) {
+    try {
+      if (editingContact) {
+        await updateContact(editingContact.id, data)
+      } else {
+        await addContact(data)
+      }
+      setEditingContact(null)
+      setAddingContact(false)
+    } catch (err) {
+      alert(`Failed to save contact: ${(err as Error).message}`)
     }
-    setEditingContact(null)
-    setAddingContact(false)
   }
 
-  function handleDeleteContact(id: string) {
-    deleteContact(id)
-    setEditingContact(null)
+  async function handleDeleteContact(id: string) {
+    try {
+      await deleteContact(id)
+      setEditingContact(null)
+    } catch (err) {
+      alert(`Failed to delete contact: ${(err as Error).message}`)
+    }
   }
 
-  function handleImport(contacts: Contact[], mode: ImportMode) {
-    if (mode === 'replace') {
-      replaceAll(contacts)
-    } else {
-      importContacts(contacts)
+  async function handleImport(contacts: Contact[], mode: ImportMode) {
+    try {
+      if (mode === 'replace') {
+        await replaceAll(contacts)
+      } else {
+        await importContacts(contacts)
+      }
+    } catch (err) {
+      alert(`Import failed: ${(err as Error).message}`)
     }
   }
 
