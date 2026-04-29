@@ -1,14 +1,26 @@
 import { useState } from 'react'
 import { useContacts } from './hooks/useContacts'
 import { useGoalSettings } from './hooks/useGoalSettings'
+import { useSession } from './lib/AuthContext'
+import { supabase } from './lib/supabase'
 import Dashboard from './components/Dashboard'
 import ContactsTable from './components/ContactsTable'
 import ContactModal from './components/ContactModal'
 import CSVImport from './components/CSVImport'
+import LoginPage from './components/LoginPage'
 
 const TABS = ['Dashboard', 'Contacts']
 
 export default function App() {
+  const session = useSession()
+
+  if (session === undefined) return null // loading
+  if (!session) return <LoginPage />
+
+  return <AuthenticatedApp />
+}
+
+function AuthenticatedApp() {
   const { contacts, addContact, updateContact, deleteContact, importContacts, replaceAll } = useContacts()
   const { goals, totalGoal, updateGoals } = useGoalSettings()
 
@@ -65,7 +77,7 @@ export default function App() {
               </div>
             </div>
 
-            <nav className="flex gap-1">
+            <nav className="flex items-center gap-1">
               {TABS.map(t => (
                 <button
                   key={t}
@@ -79,6 +91,12 @@ export default function App() {
                   {t}
                 </button>
               ))}
+              <button
+                onClick={() => supabase.auth.signOut()}
+                className="ml-2 px-3 py-1.5 rounded-lg text-sm font-medium text-stone-warm hover:text-stone-dark hover:bg-cream-200 transition-colors"
+              >
+                Sign out
+              </button>
             </nav>
           </div>
         </div>
