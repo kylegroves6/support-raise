@@ -19,9 +19,10 @@ const CAMEL_TO_SNAKE: Record<keyof Omit<Contact, 'id' | 'createdAt' | 'updatedAt
   city: 'city',
   state: 'state',
   zip: 'zip',
+  country: 'country',
   concatenatedAddress: 'concatenated_address',
   phone: 'phone',
-  callMade: 'call_made',
+  followedUp: 'call_made',
   email: 'email',
   responded: 'responded',
   financialPartner: 'financial_partner',
@@ -156,5 +157,22 @@ export function useContacts() {
     setContacts([])
   }, [])
 
-  return { contacts, loading, error, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll }
+  const deleteMany = useCallback(async (ids: string[]): Promise<void> => {
+    if (ids.length === 0) return
+    const { error } = await supabase.from('contacts').delete().in('id', ids)
+    if (error) throw error
+    setContacts(prev => prev.filter(c => !ids.includes(c.id)))
+  }, [])
+
+  const updateMany = useCallback(async (ids: string[], data: Partial<Contact>): Promise<void> => {
+    if (ids.length === 0) return
+    const userId = await getCurrentUserId()
+    const row = toRow(data, userId)
+    delete row['user_id'] // don't overwrite user_id in bulk update
+    const { error } = await supabase.from('contacts').update(row).in('id', ids)
+    if (error) throw error
+    setContacts(prev => prev.map(c => ids.includes(c.id) ? { ...c, ...data } : c))
+  }, [])
+
+  return { contacts, loading, error, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll, deleteMany, updateMany }
 }

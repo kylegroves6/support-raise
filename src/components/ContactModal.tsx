@@ -22,8 +22,8 @@ const BLANK_CONTACT: ContactFormState = {
   fullName: '', relationship: '', returning: false, topPriority: '',
   addressStatus: '', sent: false, letterAddressName: '', salutation: '',
   letterPrinted: false, mainEnvelopePrinted: false, thankYouSent: false,
-  notes: '', streetAddress: '', city: '', state: '', zip: '',
-  concatenatedAddress: '', phone: '', callMade: false, email: '',
+  notes: '', streetAddress: '', city: '', state: '', zip: '', country: '',
+  concatenatedAddress: '', phone: '', followedUp: false, email: '',
   responded: false, financialPartner: false, prayerPartner: false, pledgedToGive: false,
   formOfGift: '', giftAmount: '', dateReceived: '',
 }
@@ -139,11 +139,14 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
               <Field label="City">
                 <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} />
               </Field>
-              <Field label="State">
+              <Field label={form.country && form.country.toLowerCase() !== 'us' && form.country.toLowerCase() !== 'usa' && form.country !== '' ? 'County / Region' : 'State'}>
                 <input className="input-field" value={form.state} onChange={e => set('state', e.target.value)} />
               </Field>
-              <Field label="Zip">
+              <Field label={form.country && form.country.toLowerCase() !== 'us' && form.country.toLowerCase() !== 'usa' && form.country !== '' ? 'Postcode' : 'Zip'}>
                 <input className="input-field" value={form.zip} onChange={e => set('zip', e.target.value)} />
+              </Field>
+              <Field label="Country">
+                <input className="input-field" placeholder="Leave blank for US" value={form.country} onChange={e => set('country', e.target.value)} />
               </Field>
               <Field label="Concatenated Address">
                 <input className="input-field" value={form.concatenatedAddress} onChange={e => set('concatenatedAddress', e.target.value)} />
@@ -158,7 +161,7 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
               <Toggle label="Sent" checked={form.sent} onChange={v => set('sent', v)} />
               <Toggle label="Letter Printed" checked={form.letterPrinted} onChange={v => set('letterPrinted', v)} />
               <Toggle label="Envelope Printed" checked={form.mainEnvelopePrinted} onChange={v => set('mainEnvelopePrinted', v)} />
-              <Toggle label="Followed Up" checked={form.callMade} onChange={v => set('callMade', v)} />
+              <Toggle label="Followed Up" checked={form.followedUp} onChange={v => set('followedUp', v)} />
               <Toggle label="Thank-You Sent" checked={form.thankYouSent} onChange={v => set('thankYouSent', v)} />
             </div>
           </section>

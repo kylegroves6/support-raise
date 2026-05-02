@@ -8,9 +8,10 @@ import ContactsTable from './components/ContactsTable'
 import ContactModal from './components/ContactModal'
 import CSVImport from './components/CSVImport'
 import LoginPage from './components/LoginPage'
+import NoResponsePage from './components/NoResponsePage'
 import type { Contact, ImportMode } from './types'
 
-const TABS = ['Dashboard', 'Contacts'] as const
+const TABS = ['Dashboard', 'Contacts', 'No Response'] as const
 type Tab = typeof TABS[number]
 
 export default function App() {
@@ -23,8 +24,12 @@ export default function App() {
 }
 
 function AuthenticatedApp() {
-  const { contacts, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll } = useContacts()
+  const { contacts, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll, deleteMany, updateMany } = useContacts()
   const { goals, totalGoal, updateGoals } = useGoalSettings()
+
+  const noResponseCount = contacts.filter(
+    c => c.followedUp && !c.responded && !c.financialPartner && !c.prayerPartner
+  ).length
 
   const [tab, setTab] = useState<Tab>('Dashboard')
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
@@ -94,7 +99,7 @@ function AuthenticatedApp() {
               {TABS.map(t => (
                 <button
                   key={t}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`relative px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     tab === t
                       ? 'bg-sage-100 text-sage-600'
                       : 'text-stone-warm hover:text-stone-dark hover:bg-cream-200'
@@ -102,6 +107,11 @@ function AuthenticatedApp() {
                   onClick={() => setTab(t)}
                 >
                   {t}
+                  {t === 'No Response' && noResponseCount > 0 && (
+                    <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                      {noResponseCount > 9 ? '9+' : noResponseCount}
+                    </span>
+                  )}
                 </button>
               ))}
               <button
@@ -135,6 +145,14 @@ function AuthenticatedApp() {
               if (!confirm(`Delete all ${contacts.length} contacts? This cannot be undone.`)) return
               try { await deleteAll() } catch (err) { alert(`Failed: ${(err as Error).message}`) }
             }}
+            onDeleteMany={deleteMany}
+            onUpdateMany={updateMany}
+          />
+        )}
+        {tab === 'No Response' && (
+          <NoResponsePage
+            contacts={contacts}
+            onEdit={handleEditContact}
           />
         )}
       </main>

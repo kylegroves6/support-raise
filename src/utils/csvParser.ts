@@ -39,10 +39,11 @@ const COLUMN_MAP: Record<string, keyof Contact> = {
   'City': 'city',
   'State': 'state',
   'Zip': 'zip',
+  'Country': 'country',
   'Concatenated Address': 'concatenatedAddress',
   'Phone': 'phone',
-  'Followed Up?': 'callMade',
-  'Call Made?': 'callMade',
+  'Followed Up?': 'followedUp',
+  'Call Made?': 'followedUp',
   'Email Address': 'email',
   'Financial Partner': 'financialPartner',
   'Prayer Partner': 'prayerPartner',
@@ -54,7 +55,7 @@ const COLUMN_MAP: Record<string, keyof Contact> = {
 
 const BOOL_FIELDS = new Set<keyof Contact>([
   'returning', 'sent', 'letterPrinted', 'mainEnvelopePrinted',
-  'thankYouSent', 'callMade', 'responded', 'financialPartner', 'prayerPartner',
+  'thankYouSent', 'followedUp', 'responded', 'financialPartner', 'prayerPartner',
   'pledgedToGive',
 ])
 
@@ -72,6 +73,17 @@ export interface ImportDiagnostics {
   rowErrors: { row: number; col: string; val: string | undefined; error: string }[]
   papaParseMeta: Papa.ParseMeta
   papaParseErrors: Papa.ParseError[]
+}
+
+export function exportTemplate(): void {
+  const csv = Papa.unparse([], { columns: Object.keys(COLUMN_MAP) })
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'contacts-import-template.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export function exportCSV(contacts: Contact[]): void {

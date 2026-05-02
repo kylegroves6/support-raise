@@ -16,9 +16,10 @@ export interface Contact {
   city: string
   state: string
   zip: string
+  country: string
   concatenatedAddress: string
   phone: string
-  callMade: boolean
+  followedUp: boolean
   email: string
   responded: boolean
   financialPartner: boolean

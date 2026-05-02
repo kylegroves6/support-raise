@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { exportCSV } from '../utils/csvParser'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { exportCSV, exportTemplate } from '../utils/csvParser'
 import type { Contact } from '../types'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -60,8 +60,156 @@ interface Filters {
   relationship: string
   addressStatus: string
   sent: string
-  callMade: string
+  followedUp: string
   partner: '' | 'financial' | 'prayer' | 'none'
+}
+
+const BULK_FIELDS: { label: string; field: keyof Contact; type: 'boolean' | 'select'; options?: string[] }[] = [
+  { label: 'Sent', field: 'sent', type: 'boolean' },
+  { label: 'Followed Up', field: 'followedUp', type: 'boolean' },
+  { label: 'Responded', field: 'responded', type: 'boolean' },
+  { label: 'Financial Partner', field: 'financialPartner', type: 'boolean' },
+  { label: 'Prayer Partner', field: 'prayerPartner', type: 'boolean' },
+  { label: 'Pledged to Give', field: 'pledgedToGive', type: 'boolean' },
+  { label: 'Thank-you Sent', field: 'thankYouSent', type: 'boolean' },
+  { label: 'Letter Printed', field: 'letterPrinted', type: 'boolean' },
+  { label: 'Returning', field: 'returning', type: 'boolean' },
+  { label: 'Address Status', field: 'addressStatus', type: 'select', options: ADDRESS_STATUSES },
+  { label: 'Relationship', field: 'relationship', type: 'select', options: RELATIONSHIPS },
+]
+
+interface BulkUpdatePanelProps {
+  count: number
+  onUpdate: (field: keyof Contact, value: boolean | string) => void
+  onDelete: () => void
+  onClear: () => void
+}
+
+function BulkUpdatePanel({ count, onUpdate, onDelete, onClear }: BulkUpdatePanelProps) {
+  const [field, setField] = useState<string>('')
+  const [value, setValue] = useState<string>('')
+
+  const selected = BULK_FIELDS.find(f => f.field === field)
+
+  function handleApply() {
+    if (!selected) return
+    if (selected.type === 'boolean') {
+      onUpdate(selected.field, value === 'true')
+    } else {
+      onUpdate(selected.field, value)
+    }
+    setField('')
+    setValue('')
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 bg-sage-50 border border-sage-200 rounded-lg text-sm">
+      <span className="font-medium text-sage-700">{count} selected</span>
+
+      <div className="flex items-center gap-2 ml-2">
+        <Select value={field} onValueChange={v => { setField(v); setValue('') }}>
+          <SelectTrigger className="h-7 text-xs w-[160px]">
+            <SelectValue placeholder="Set field…" />
+          </SelectTrigger>
+          <SelectContent>
+            {BULK_FIELDS.map(f => (
+              <SelectItem key={String(f.field)} value={String(f.field)}>{f.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {selected && selected.type === 'boolean' && (
+          <Select value={value} onValueChange={setValue}>
+            <SelectTrigger className="h-7 text-xs w-[100px]">
+              <SelectValue placeholder="Value" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="true">Yes</SelectItem>
+              <SelectItem value="false">No</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+
+        {selected && selected.type === 'select' && (
+          <Select value={value} onValueChange={setValue}>
+            <SelectTrigger className="h-7 text-xs w-[150px]">
+              <SelectValue placeholder="Value" />
+            </SelectTrigger>
+            <SelectContent>
+              {selected.options!.map(o => (
+                <SelectItem key={o} value={o}>{o}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        <button
+          className="btn-primary text-xs h-7 px-3 disabled:opacity-40"
+          disabled={!field || value === ''}
+          onClick={handleApply}
+        >
+          Apply
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 ml-auto">
+        <button
+          className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+          onClick={onDelete}
+        >
+          Delete {count}
+        </button>
+        <button className="text-xs text-stone-warm hover:text-stone-dark transition-colors" onClick={onClear}>
+          Clear
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Dropdown for Export CSV / Download Template
+function ExportDropdown({ disabled, contacts }: { disabled: boolean; contacts: Contact[] }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        className="btn-secondary flex items-center gap-1"
+        onClick={() => setOpen(o => !o)}
+      >
+        Export
+        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor">
+          <path d="M6 8L2 4h8L6 8z" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 w-48 bg-white border border-cream-300 rounded-lg shadow-lg z-20 py-1">
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-stone-dark hover:bg-cream-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={disabled}
+            onClick={() => { exportCSV(contacts); setOpen(false) }}
+          >
+            Export contacts CSV
+          </button>
+          <button
+            className="w-full text-left px-4 py-2 text-sm text-stone-dark hover:bg-cream-100 transition-colors"
+            onClick={() => { exportTemplate(); setOpen(false) }}
+          >
+            Download import template
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 interface Props {
@@ -70,23 +218,23 @@ interface Props {
   onAdd: () => void
   onImport: () => void
   onDeleteAll: () => void
+  onDeleteMany: (ids: string[]) => Promise<void>
+  onUpdateMany: (ids: string[], data: Partial<Contact>) => Promise<void>
 }
 
-export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDeleteAll }: Props) {
-  function handleExport() {
-    exportCSV(contacts)
-  }
+export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDeleteAll, onDeleteMany, onUpdateMany }: Props) {
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<Filters>({
     relationship: '',
     addressStatus: '',
     sent: '',
-    callMade: '',
+    followedUp: '',
     partner: '',
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'fullName', dir: 'asc' })
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 25
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   function setFilter(key: keyof Filters, val: string) {
     setFilters(f => ({ ...f, [key]: val }))
@@ -117,7 +265,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
     if (filters.relationship) rows = rows.filter(c => c.relationship === filters.relationship)
     if (filters.addressStatus) rows = rows.filter(c => c.addressStatus === filters.addressStatus)
     if (filters.sent !== '') rows = rows.filter(c => c.sent === (filters.sent === 'true'))
-    if (filters.callMade !== '') rows = rows.filter(c => c.callMade === (filters.callMade === 'true'))
+    if (filters.followedUp !== '') rows = rows.filter(c => c.followedUp === (filters.followedUp === 'true'))
     if (filters.partner === 'financial') rows = rows.filter(c => c.financialPartner)
     if (filters.partner === 'prayer') rows = rows.filter(c => c.prayerPartner && !c.financialPartner)
     if (filters.partner === 'none') rows = rows.filter(c => !c.financialPartner && !c.prayerPartner)
@@ -143,9 +291,55 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
   const activeFilters = Object.values(filters).filter(Boolean).length
 
   function clearFilters() {
-    setFilters({ relationship: '', addressStatus: '', sent: '', callMade: '', partner: '' })
+    setFilters({ relationship: '', addressStatus: '', sent: '', followedUp: '', partner: '' })
     setSearch('')
     setPage(1)
+  }
+
+  const pagedIds = paged.map(c => c.id)
+  const allPageSelected = pagedIds.length > 0 && pagedIds.every(id => selected.has(id))
+  const somePageSelected = pagedIds.some(id => selected.has(id))
+
+  function toggleAll() {
+    if (allPageSelected) {
+      setSelected(prev => {
+        const next = new Set(prev)
+        pagedIds.forEach(id => next.delete(id))
+        return next
+      })
+    } else {
+      setSelected(prev => new Set([...prev, ...pagedIds]))
+    }
+  }
+
+  function toggleOne(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleBulkDelete() {
+    const ids = [...selected]
+    if (!confirm(`Delete ${ids.length} contact${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return
+    try {
+      await onDeleteMany(ids)
+      setSelected(new Set())
+    } catch (err) {
+      alert(`Failed to delete: ${(err as Error).message}`)
+    }
+  }
+
+  async function handleBulkUpdate(field: keyof Contact, value: boolean | string) {
+    const ids = [...selected]
+    try {
+      await onUpdateMany(ids, { [field]: value })
+      setSelected(new Set())
+    } catch (err) {
+      alert(`Failed to update: ${(err as Error).message}`)
+    }
   }
 
   return (
@@ -159,7 +353,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
         />
         <div className="flex gap-2">
           <button className="btn-secondary" onClick={onImport}>Import CSV</button>
-          <button className="btn-secondary" onClick={handleExport} disabled={contacts.length === 0}>Export CSV</button>
+          <ExportDropdown disabled={contacts.length === 0} contacts={contacts} />
           <button className="btn-primary" onClick={onAdd}>+ Add Contact</button>
         </div>
       </div>
@@ -199,7 +393,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
             </SelectContent>
           </Select>
 
-          <Select value={filters.callMade} onValueChange={v => setFilter('callMade', v === '__all__' ? '' : v)}>
+          <Select value={filters.followedUp} onValueChange={v => setFilter('followedUp', v === '__all__' ? '' : v)}>
             <SelectTrigger className="w-auto min-w-[130px] h-8 text-xs">
               <SelectValue placeholder="Followed Up?" />
             </SelectTrigger>
@@ -242,11 +436,29 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
         </div>
       </div>
 
+      {selected.size > 0 && (
+        <BulkUpdatePanel
+          count={selected.size}
+          onUpdate={handleBulkUpdate}
+          onDelete={handleBulkDelete}
+          onClear={() => setSelected(new Set())}
+        />
+      )}
+
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-cream-100 border-b border-cream-200">
               <tr>
+                <th className="px-3 py-2.5 w-8">
+                  <input
+                    type="checkbox"
+                    className="rounded border-cream-300 accent-sage-500"
+                    checked={allPageSelected}
+                    ref={el => { if (el) el.indeterminate = somePageSelected && !allPageSelected }}
+                    onChange={toggleAll}
+                  />
+                </th>
                 <Th label="Name" field="fullName" sort={sort} onSort={handleSort} />
                 <Th label="Relationship" field="relationship" sort={sort} onSort={handleSort} />
                 <Th label="Priority" field="topPriority" sort={sort} onSort={handleSort} />
@@ -258,7 +470,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
             <tbody className="divide-y divide-cream-100">
               {paged.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-stone-warm text-sm">
+                  <td colSpan={7} className="text-center py-12 text-stone-warm text-sm">
                     {contacts.length === 0 ? 'No contacts yet. Add one or import a CSV.' : 'No contacts match these filters.'}
                   </td>
                 </tr>
@@ -266,9 +478,17 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
                 paged.map(c => (
                   <tr
                     key={c.id}
-                    className="hover:bg-cream-50 cursor-pointer transition-colors"
+                    className={`hover:bg-cream-50 cursor-pointer transition-colors ${selected.has(c.id) ? 'bg-sage-50' : ''}`}
                     onClick={() => onEdit(c)}
                   >
+                    <td className="px-3 py-2.5" onClick={e => { e.stopPropagation(); toggleOne(c.id) }}>
+                      <input
+                        type="checkbox"
+                        className="rounded border-cream-300 accent-sage-500"
+                        checked={selected.has(c.id)}
+                        onChange={() => toggleOne(c.id)}
+                      />
+                    </td>
                     <td className="px-3 py-2.5 max-w-[180px]">
                       <p className="font-medium text-stone-dark truncate" title={c.fullName}>{c.fullName}</p>
                       {c.email && <p className="text-xs text-stone-warm truncate" title={c.email}>{c.email}</p>}
@@ -290,7 +510,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
                     <td className="px-3 py-2.5 min-w-[140px]">
                       <div className="flex flex-wrap gap-1">
                         {c.sent && <Chip label="Sent" color="blue" />}
-                        {c.callMade && <Chip label="Followed Up" color="green" />}
+                        {c.followedUp && <Chip label="Followed Up" color="green" />}
                         {c.responded && !c.financialPartner && !c.prayerPartner && <Chip label="Responded" color="amber" />}
                         {c.financialPartner && <Chip label="Partner" color="green" />}
                         {c.prayerPartner && <Chip label="Prayer" color="cream" />}

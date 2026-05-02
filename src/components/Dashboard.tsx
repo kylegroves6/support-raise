@@ -81,7 +81,7 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
     return {
       total: contacts.length,
       sent: contacts.filter(c => c.sent).length,
-      called: contacts.filter(c => c.callMade).length,
+      called: contacts.filter(c => c.followedUp).length,
       partners: partners.length,
       prayerPartners: prayerPartners.length,
       totalReceived,
@@ -92,7 +92,7 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
 
   const lists = useMemo(() => {
     const needFollowUp = contacts.filter(
-      c => c.sent && !c.callMade && !c.financialPartner && !c.responded
+      c => c.sent && !c.followedUp && !c.financialPartner && !c.responded
     )
     const pledgedFollowUp = needFollowUp.filter(c => c.pledgedToGive)
     const nonPledgedFollowUp = needFollowUp.filter(c => !c.pledgedToGive)
