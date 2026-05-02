@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import GoalSettings from './GoalSettings'
 import type { Contact, Goals } from '../types'
 
@@ -262,23 +262,9 @@ interface ActionListProps {
   showPledged?: boolean
 }
 
-const PREVIEW_COUNT = 8
-
 function ActionList({ title, description, items, onEdit, emptyMsg, badgeColor, showPledged }: ActionListProps) {
-  const [expanded, setExpanded] = useState(false)
-  const expandedRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (expanded && expandedRef.current) {
-      expandedRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    }
-  }, [expanded])
-
-  const visible = expanded ? items : items.slice(0, PREVIEW_COUNT)
-  const overflow = items.length - PREVIEW_COUNT
-
   return (
-    <div className="card">
+    <div className="card flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className="font-semibold text-stone-dark text-sm">{title}</h3>
@@ -291,28 +277,10 @@ function ActionList({ title, description, items, onEdit, emptyMsg, badgeColor, s
       {items.length === 0 ? (
         <p className="text-xs text-stone-light italic py-2">{emptyMsg}</p>
       ) : (
-        <div className="divide-y divide-cream-200 -mx-1">
-          {visible.map(c => (
+        <div className="divide-y divide-cream-200 -mx-1 overflow-y-auto max-h-72">
+          {items.map(c => (
             <ContactRow key={c.id} contact={c} onEdit={onEdit} showPledged={showPledged} />
           ))}
-          {overflow > 0 && !expanded && (
-            <button
-              className="w-full text-xs text-stone-warm hover:text-stone-dark pt-2 pb-1 text-center transition-colors"
-              onClick={() => setExpanded(true)}
-            >
-              +{overflow} more — show all
-            </button>
-          )}
-          {expanded && overflow > 0 && (
-            <div ref={expandedRef}>
-              <button
-                className="w-full text-xs text-stone-warm hover:text-stone-dark pt-2 pb-1 text-center transition-colors"
-                onClick={() => setExpanded(false)}
-              >
-                Show less
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>
