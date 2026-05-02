@@ -94,20 +94,22 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
     const needFollowUp = contacts.filter(
       c => c.sent && !c.followedUp && !c.financialPartner && !c.responded
     )
+    const hasContactMethod = (c: Contact) =>
+      (c.phone && c.phone.trim() !== '') || (c.email && c.email.trim() !== '')
     const pledgedFollowUp = needFollowUp.filter(c => c.pledgedToGive)
     const nonPledgedFollowUp = needFollowUp.filter(c => !c.pledgedToGive)
     const followUpNow = [
       ...pledgedFollowUp,
-      ...nonPledgedFollowUp.filter(c => c.phone && c.phone.trim() !== ''),
+      ...nonPledgedFollowUp.filter(hasContactMethod),
     ]
-    const getContactInfo = nonPledgedFollowUp.filter(c => !c.phone || c.phone.trim() === '')
+    const noContactMethod = nonPledgedFollowUp.filter(c => !hasContactMethod(c))
     const reachOutNext = contacts
       .filter(c => !c.sent && c.topPriority != null)
       .sort((a, b) => (a.topPriority ?? 0) - (b.topPriority ?? 0))
     const awaitingGift = contacts.filter(c => c.pledgedToGive && !c.financialPartner)
     const sendThankYou = contacts.filter(c => c.financialPartner && !c.thankYouSent)
 
-    return { followUpNow, getContactInfo, reachOutNext, awaitingGift, sendThankYou }
+    return { followUpNow, noContactMethod, reachOutNext, awaitingGift, sendThankYou }
   }, [contacts])
 
   const pctReceived = Math.min((stats.totalReceived / totalGoal) * 100, 100)
@@ -204,11 +206,11 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
           showPledged
         />
         <ActionList
-          title="Get Contact Info"
-          description="Sent — no phone number on file"
-          items={lists.getContactInfo}
+          title="No Contact Method"
+          description="Sent — no phone or email on file"
+          items={lists.noContactMethod}
           onEdit={onEditContact}
-          emptyMsg="Everyone has a phone number"
+          emptyMsg="Everyone has a contact method"
           badgeColor="bg-orange-50 text-orange-600 border border-orange-100"
           showPledged
         />
