@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef, useEffect } from 'react'
 import GoalSettings from './GoalSettings'
 import type { Contact, Goals } from '../types'
 
@@ -262,7 +262,21 @@ interface ActionListProps {
   showPledged?: boolean
 }
 
+const PREVIEW_COUNT = 8
+
 function ActionList({ title, description, items, onEdit, emptyMsg, badgeColor, showPledged }: ActionListProps) {
+  const [expanded, setExpanded] = useState(false)
+  const expandedRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (expanded && expandedRef.current) {
+      expandedRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [expanded])
+
+  const visible = expanded ? items : items.slice(0, PREVIEW_COUNT)
+  const overflow = items.length - PREVIEW_COUNT
+
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-3">
@@ -278,13 +292,26 @@ function ActionList({ title, description, items, onEdit, emptyMsg, badgeColor, s
         <p className="text-xs text-stone-light italic py-2">{emptyMsg}</p>
       ) : (
         <div className="divide-y divide-cream-200 -mx-1">
-          {items.slice(0, 8).map(c => (
+          {visible.map(c => (
             <ContactRow key={c.id} contact={c} onEdit={onEdit} showPledged={showPledged} />
           ))}
-          {items.length > 8 && (
-            <p className="text-xs text-stone-warm pt-2 text-center">
-              +{items.length - 8} more
-            </p>
+          {overflow > 0 && !expanded && (
+            <button
+              className="w-full text-xs text-stone-warm hover:text-stone-dark pt-2 pb-1 text-center transition-colors"
+              onClick={() => setExpanded(true)}
+            >
+              +{overflow} more — show all
+            </button>
+          )}
+          {expanded && overflow > 0 && (
+            <div ref={expandedRef}>
+              <button
+                className="w-full text-xs text-stone-warm hover:text-stone-dark pt-2 pb-1 text-center transition-colors"
+                onClick={() => setExpanded(false)}
+              >
+                Show less
+              </button>
+            </div>
           )}
         </div>
       )}
