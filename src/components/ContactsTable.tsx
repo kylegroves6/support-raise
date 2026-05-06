@@ -473,7 +473,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
                 <Th label="Name" field="fullName" sort={sort} onSort={handleSort} />
                 <Th label="Relationship" field="relationship" sort={sort} onSort={handleSort} />
                 <Th label="Priority" field="topPriority" sort={sort} onSort={handleSort} />
-                <Th label="Address" field="addressStatus" sort={sort} onSort={handleSort} />
+                <Th label="Delivery Method" field="addressStatus" sort={sort} onSort={handleSort} />
                 <th className="text-left px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-stone-warm whitespace-nowrap">Status</th>
                 <Th label="Gift" field="giftAmount" sort={sort} onSort={handleSort} />
               </tr>

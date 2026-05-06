@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useContacts } from '../hooks/useContacts'
-import type { Trip, Contact } from '../types'
+import type { Trip } from '../types'
 
 type DbTripRow = {
   id: string
@@ -36,6 +36,9 @@ function fmt(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n)
 }
 
+type SortKey = 'name' | 'relationship' | 'gift'
+type SortDir = 'asc' | 'desc'
+
 interface TripDetailProps {
   trip: Trip
   onBack: () => void
@@ -43,14 +46,36 @@ interface TripDetailProps {
 
 function TripDetail({ trip, onBack }: TripDetailProps) {
   const { contacts, loading } = useContacts(trip.id)
+  const [sortKey, setSortKey] = useState<SortKey>('name')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
 
   const partners = contacts.filter(c => c.financialPartner)
   const totalGiven = partners.reduce((sum, c) => sum + (c.giftAmount ?? 0), 0)
   const prayerOnly = contacts.filter(c => c.prayerPartner && !c.financialPartner)
 
+  const sorted = useMemo(() => {
+    return [...contacts].sort((a, b) => {
+      let cmp = 0
+      if (sortKey === 'name') cmp = a.fullName.localeCompare(b.fullName)
+      else if (sortKey === 'relationship') cmp = (a.relationship ?? '').localeCompare(b.relationship ?? '')
+      else if (sortKey === 'gift') cmp = (a.giftAmount ?? 0) - (b.giftAmount ?? 0)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [contacts, sortKey, sortDir])
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  function SortIcon({ col }: { col: SortKey }) {
+    if (sortKey !== col) return <span className="opacity-30">↕</span>
+    return <span>{sortDir === 'asc' ? '↑' : '↓'}</span>
+  }
+
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-3 mb-5">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex items-center gap-3 mb-5 shrink-0">
         <button onClick={onBack} className="text-stone-warm hover:text-stone-dark transition-colors text-sm flex items-center gap-1">
           ← Back
         </button>
@@ -64,7 +89,7 @@ function TripDetail({ trip, onBack }: TripDetailProps) {
         <p className="text-sm text-stone-warm py-8 text-center">Loading…</p>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-3 mb-5">
+          <div className="grid grid-cols-3 gap-3 mb-5 shrink-0">
             <div className="bg-cream-100 rounded-xl p-3 text-center">
               <p className="text-xl font-semibold text-stone-dark">{partners.length}</p>
               <p className="text-xs text-stone-warm mt-0.5">Financial Partners</p>
@@ -79,22 +104,39 @@ function TripDetail({ trip, onBack }: TripDetailProps) {
             </div>
           </div>
 
-          <div className="overflow-y-auto flex-1 [scrollbar-width:thin]">
+          <div className="overflow-y-auto flex-1 min-h-0 [scrollbar-width:thin]">
             {contacts.length === 0 ? (
               <p className="text-sm text-stone-warm text-center py-8">No contact data for this trip.</p>
             ) : (
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-white">
+                <thead className="sticky top-0 bg-white z-10">
                   <tr className="border-b border-cream-200">
-                    <th className="text-left px-2 py-2 text-xs font-semibold text-stone-warm">Name</th>
-                    <th className="text-left px-2 py-2 text-xs font-semibold text-stone-warm">Relationship</th>
-                    <th className="text-left px-2 py-2 text-xs font-semibold text-stone-warm">Status</th>
-                    <th className="text-right px-2 py-2 text-xs font-semibold text-stone-warm">Gift</th>
+                    <th className="text-left px-2 py-2 text-xs font-semibold text-stone-warm">
+                      <button onClick={() => handleSort('name')} className="flex items-center gap-1 hover:text-stone-dark">
+                        Name <SortIcon col="name" />
+                      </button>
+                    </th>
+                    <th className="text-left px-2 py-2 text-xs font-semibold text-stone-warm">
+                      <button onClick={() => handleSort('relationship')} className="flex items-center gap-1 hover:text-stone-dark">
+                        Relationship <SortIcon col="relationship" />
+                      </button>
+                    </th>
+                    <th className="text-right px-2 py-2 text-xs font-semibold text-stone-warm">
+                      <button onClick={() => handleSort('gift')} className="flex items-center gap-1 justify-end hover:text-stone-dark ml-auto">
+                        Gift <SortIcon col="gift" />
+                      </button>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-cream-100">
-                  {contacts.map(c => (
-                    <ContactRow key={c.id} contact={c} />
+                  {sorted.map(c => (
+                    <tr key={c.id} className="hover:bg-cream-50 transition-colors">
+                      <td className="px-2 py-2 font-medium text-stone-dark">{c.fullName}</td>
+                      <td className="px-2 py-2 text-stone-warm text-xs">{c.relationship}</td>
+                      <td className="px-2 py-2 text-right font-mono text-xs text-sage-600">
+                        {c.giftAmount != null && c.giftAmount !== 0 ? fmt(c.giftAmount) : ''}
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -103,30 +145,6 @@ function TripDetail({ trip, onBack }: TripDetailProps) {
         </>
       )}
     </div>
-  )
-}
-
-function ContactRow({ contact: c }: { contact: Contact }) {
-  const tags: { label: string; color: string }[] = []
-  if (c.financialPartner) tags.push({ label: 'Partner', color: 'bg-sage-100 text-sage-600' })
-  if (c.prayerPartner && !c.financialPartner) tags.push({ label: 'Prayer', color: 'bg-cream-200 text-stone-warm' })
-  if (c.pledgedToGive && !c.financialPartner) tags.push({ label: 'Pledged', color: 'bg-amber-50 text-amber-700' })
-
-  return (
-    <tr className="hover:bg-cream-50 transition-colors">
-      <td className="px-2 py-2 font-medium text-stone-dark">{c.fullName}</td>
-      <td className="px-2 py-2 text-stone-warm text-xs">{c.relationship}</td>
-      <td className="px-2 py-2">
-        <div className="flex flex-wrap gap-1">
-          {tags.map(t => (
-            <span key={t.label} className={`chip ${t.color}`}>{t.label}</span>
-          ))}
-        </div>
-      </td>
-      <td className="px-2 py-2 text-right font-mono text-xs text-sage-600">
-        {c.giftAmount != null && c.giftAmount !== 0 ? fmt(c.giftAmount) : ''}
-      </td>
-    </tr>
   )
 }
 
@@ -161,7 +179,7 @@ export default function TripHistory({ onClose }: Props) {
           <button onClick={onClose} className="btn-ghost text-stone-warm text-xl leading-none">×</button>
         </div>
 
-        <div className="px-6 py-5 flex-1 overflow-hidden flex flex-col min-h-0">
+        <div className="px-6 py-5 flex-1 flex flex-col min-h-0 overflow-hidden">
           {selected ? (
             <TripDetail trip={selected} onBack={() => setSelected(null)} />
           ) : loading ? (
