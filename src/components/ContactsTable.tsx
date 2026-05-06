@@ -3,7 +3,7 @@ import { exportCSV, exportTemplate } from '../utils/csvParser'
 import type { Contact } from '../types'
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-const ADDRESS_METHODS = ['Mailing Address', 'Known Email', 'Phone', 'Hand Delivery']
+const DELIVERY_INTENTS = ['Send by Mail', 'Hand Delivery', 'Digital Contact']
 
 type ChipColor = 'green' | 'amber' | 'red' | 'blue' | 'gray' | 'cream'
 
@@ -66,7 +66,7 @@ const BULK_FIELDS: { label: string; field: keyof Contact; type: 'boolean' | 'sel
   { label: 'Thank-you Sent', field: 'thankYouSent', type: 'boolean' },
   { label: 'Letter Printed', field: 'letterPrinted', type: 'boolean' },
   { label: 'Returning', field: 'returning', type: 'boolean' },
-  { label: 'Address Status', field: 'addressStatus', type: 'select', options: ADDRESS_METHODS },
+  { label: 'Delivery Intent', field: 'addressStatus', type: 'select', options: DELIVERY_INTENTS },
   { label: 'Relationship', field: 'relationship', type: 'select' },
 ]
 
@@ -386,11 +386,11 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
 
           <Select value={filters.addressStatus} onValueChange={v => setFilter('addressStatus', v === '__all__' ? '' : v)}>
             <SelectTrigger className="w-auto min-w-[150px] h-8 text-xs">
-              <SelectValue placeholder="All Contact Methods" />
+              <SelectValue placeholder="All Delivery Intents" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">All Contact Methods</SelectItem>
-              {ADDRESS_METHODS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              <SelectItem value="__all__">All Delivery Intents</SelectItem>
+              {DELIVERY_INTENTS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
 
@@ -515,7 +515,11 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       <div className="flex flex-wrap gap-1">
                         {(c.addressStatus || '').split(',').map(s => s.trim()).filter(Boolean).map(m => (
-                          <Chip key={m} label={m === 'Mailing Address' ? 'Mail' : m === 'Known Email' ? 'Email' : m === 'Hand Delivery' ? 'In Person' : m} color={m === 'Mailing Address' ? 'green' : 'cream'} />
+                          <Chip
+                            key={m}
+                            label={m === 'Send by Mail' ? 'Mail' : m === 'Hand Delivery' ? 'In Person' : m === 'Digital Contact' ? 'Digital' : m}
+                            color={m === 'Send by Mail' ? 'green' : m === 'Hand Delivery' ? 'amber' : m === 'Digital Contact' ? 'blue' : 'gray'}
+                          />
                         ))}
                       </div>
                     </td>

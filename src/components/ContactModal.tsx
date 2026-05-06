@@ -8,20 +8,20 @@ const RELATIONSHIP_SUGGESTIONS = [
   "Teacher / Professor", "Mentor", "Community Leader", "Former Employer",
 ]
 
-const ADDRESS_METHOD_OPTIONS = ['Mailing Address', 'Known Email', 'Phone', 'Hand Delivery'] as const
-type AddressMethod = typeof ADDRESS_METHOD_OPTIONS[number]
+const DELIVERY_INTENTS = ['Send by Mail', 'Hand Delivery', 'Digital Contact'] as const
+type DeliveryIntent = typeof DELIVERY_INTENTS[number]
 
-function parseAddressMethods(status: string): Set<AddressMethod> {
-  const set = new Set<AddressMethod>()
+function parseDeliveryIntents(status: string): Set<DeliveryIntent> {
+  const set = new Set<DeliveryIntent>()
   for (const part of status.split(',')) {
-    const trimmed = part.trim() as AddressMethod
-    if ((ADDRESS_METHOD_OPTIONS as readonly string[]).includes(trimmed)) set.add(trimmed)
+    const trimmed = part.trim() as DeliveryIntent
+    if ((DELIVERY_INTENTS as readonly string[]).includes(trimmed)) set.add(trimmed)
   }
   return set
 }
 
-function serializeAddressMethods(methods: Set<AddressMethod>): string {
-  return ADDRESS_METHOD_OPTIONS.filter(m => methods.has(m)).join(', ')
+function serializeDeliveryIntents(intents: Set<DeliveryIntent>): string {
+  return DELIVERY_INTENTS.filter(m => intents.has(m)).join(', ')
 }
 
 const GIFT_FORMS = ["", "Online Donation", "Check", "Cash"]
@@ -192,52 +192,63 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
 
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-warm mb-3">Address</h3>
-            {(() => {
-              const methods = parseAddressMethods(form.addressStatus)
-              function toggleMethod(m: AddressMethod) {
-                const next = new Set(methods)
-                if (next.has(m)) next.delete(m); else next.add(m)
-                set('addressStatus', serializeAddressMethods(next))
-              }
-              const hasMailingAddress = methods.has('Mailing Address')
-              const isNonUS = form.country && form.country.toLowerCase() !== 'us' && form.country.toLowerCase() !== 'usa' && form.country !== ''
-              return (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-4">
-                    {ADDRESS_METHOD_OPTIONS.map(m => (
-                      <label key={m} className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          className="rounded border-cream-300 accent-sage-500 w-4 h-4"
-                          checked={methods.has(m)}
-                          onChange={() => toggleMethod(m)}
-                        />
-                        <span className="text-sm text-stone-dark">{m}</span>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Street Address">
+                  <input className="input-field" value={form.streetAddress} onChange={e => set('streetAddress', e.target.value)} />
+                </Field>
+                <Field label="City">
+                  <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} />
+                </Field>
+                <Field label={form.country && form.country.toLowerCase() !== 'us' && form.country.toLowerCase() !== 'usa' && form.country !== '' ? 'County / Region' : 'State'}>
+                  <input className="input-field" value={form.state} onChange={e => set('state', e.target.value)} />
+                </Field>
+                <Field label={form.country && form.country.toLowerCase() !== 'us' && form.country.toLowerCase() !== 'usa' && form.country !== '' ? 'Postcode' : 'Zip'}>
+                  <input className="input-field" value={form.zip} onChange={e => set('zip', e.target.value)} />
+                </Field>
+                <Field label="Country">
+                  <input className="input-field" placeholder="Leave blank for US" value={form.country} onChange={e => set('country', e.target.value)} />
+                </Field>
+              </div>
+              <div>
+                <p className="label mb-2">Delivery Intent</p>
+                <div className="flex flex-wrap gap-3">
+                  {DELIVERY_INTENTS.map(intent => {
+                    const intents = parseDeliveryIntents(form.addressStatus)
+                    const checked = intents.has(intent)
+                    function toggle() {
+                      const next = new Set(intents)
+                      if (next.has(intent)) next.delete(intent); else next.add(intent)
+                      set('addressStatus', serializeDeliveryIntents(next))
+                    }
+                    return (
+                      <label key={intent} className="flex items-center gap-2 cursor-pointer select-none group">
+                        <span
+                          onClick={toggle}
+                          className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-colors cursor-pointer
+                            ${checked ? 'bg-sage-400 border-sage-400' : 'bg-white border-cream-300 group-hover:border-sage-300'}`}
+                        >
+                          {checked && (
+                            <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 6l3 3 5-5" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className="text-sm text-stone-dark">{intent}</span>
                       </label>
-                    ))}
-                  </div>
-                  {hasMailingAddress && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 pl-1 border-l-2 border-cream-200">
-                      <Field label="Street Address">
-                        <input className="input-field" value={form.streetAddress} onChange={e => set('streetAddress', e.target.value)} />
-                      </Field>
-                      <Field label="City">
-                        <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} />
-                      </Field>
-                      <Field label={isNonUS ? 'County / Region' : 'State'}>
-                        <input className="input-field" value={form.state} onChange={e => set('state', e.target.value)} />
-                      </Field>
-                      <Field label={isNonUS ? 'Postcode' : 'Zip'}>
-                        <input className="input-field" value={form.zip} onChange={e => set('zip', e.target.value)} />
-                      </Field>
-                      <Field label="Country">
-                        <input className="input-field" placeholder="Leave blank for US" value={form.country} onChange={e => set('country', e.target.value)} />
-                      </Field>
-                    </div>
-                  )}
+                    )
+                  })}
                 </div>
-              )
-            })()}
+                {parseDeliveryIntents(form.addressStatus).has('Digital Contact') && !form.email && !form.phone && (
+                  <p className="mt-2 text-xs text-amber-600 flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 3a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 018 4zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                    No email or phone on file for this contact.
+                  </p>
+                )}
+              </div>
+            </div>
           </section>
 
           <section>
