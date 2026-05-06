@@ -102,7 +102,7 @@ supabase db push
 
 ---
 
-## Phase 1.5 — Vercel deployment + mission settings (near-term)
+## Phase 1.5 — Deployment, testing, observability, and UX (near-term)
 
 ### Vercel deployment
 - Add `vercel.json` with SPA rewrite rule so page refresh works on sub-routes
@@ -114,6 +114,26 @@ supabase db push
 - In Google Cloud Console → OAuth client, add the Vercel production URL to **Authorized redirect URIs** (e.g. `https://your-app.vercel.app`)
 - Add any Vercel preview URL pattern if you want OAuth to work on preview deploys too
 - Supabase already handles the callback route (`/auth/v1/callback`) — no app-side route needed
+
+### Sentry — error monitoring + session replay
+- Install `@sentry/react`, init in `main.tsx` with DSN from sentry.io
+- Wrap app in `Sentry.ErrorBoundary` so unhandled crashes are caught and reported
+- Enable **Session Replay** so you can watch what the user did leading up to an error
+- Add `VITE_SENTRY_DSN` to `.env` locally and as a Vercel environment variable
+- Goal: catch errors before any user actually experiences them
+
+### Testing
+- **Vitest + React Testing Library** — unit and component tests for hooks and critical UI (contact CRUD, import/export logic, trip rollover)
+- **Playwright** — E2E smoke tests on the golden paths: sign in, add contact, import CSV, edit contact, view trip history
+- No PyTest — no Python in the stack
+- Consider gating Vercel preview deploys on Playwright passing in CI
+
+### Quick import / category-filtered CSV export
+Two options to decide between (or combine):
+1. **Category-filtered template export** — checkboxes on the existing Export Template flow so the downloaded CSV only includes selected column groups (e.g. address-only, gift-only, contact info only). Reduces friction when filling out partial data.
+2. **Quick Import modal** — user picks which fields/categories they want to populate, downloads a pre-filtered template, fills it in, and re-imports. Keeps the import flow self-contained.
+
+Leaning toward option 1 as the simpler starting point — reuses the existing export and import flows.
 
 ### Mission settings (make the app generic)
 Pull hardcoded "Tokyo Mission" branding and dates out into a per-user settings record.
