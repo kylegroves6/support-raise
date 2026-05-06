@@ -20,9 +20,6 @@ function parseDeliveryIntents(status: string): Set<DeliveryIntent> {
   return set
 }
 
-function serializeDeliveryIntents(intents: Set<DeliveryIntent>): string {
-  return DELIVERY_INTENTS.filter(m => intents.has(m)).join(', ')
-}
 
 const GIFT_FORMS = ["", "Online Donation", "Check", "Cash"]
 
@@ -34,7 +31,7 @@ type ContactFormState = Omit<Contact, 'id' | 'topPriority' | 'giftAmount' | 'cre
 const BLANK_CONTACT: ContactFormState = {
   fullName: '', relationship: '', returning: false, topPriority: '',
   addressStatus: '', sent: false, letterAddressName: '', salutation: '',
-  letterPrinted: false, mainEnvelopePrinted: false, thankYouSent: false,
+  thankYouSent: false,
   notes: '', streetAddress: '', city: '', state: '', zip: '', country: '',
   concatenatedAddress: '', phone: '', followedUp: false, email: '',
   responded: false, financialPartner: false, prayerPartner: false, pledgedToGive: false,
@@ -214,25 +211,20 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
                 <p className="label mb-2">Delivery Intent</p>
                 <div className="flex flex-wrap gap-3">
                   {DELIVERY_INTENTS.map(intent => {
-                    const intents = parseDeliveryIntents(form.addressStatus)
-                    const checked = intents.has(intent)
-                    function toggle() {
-                      const next = new Set(intents)
-                      if (next.has(intent)) next.delete(intent); else next.add(intent)
-                      set('addressStatus', serializeDeliveryIntents(next))
+                    const current = parseDeliveryIntents(form.addressStatus)
+                    const checked = current.has(intent)
+                    function select() {
+                      // clicking the active option deselects; otherwise exclusively selects
+                      set('addressStatus', checked ? '' : intent)
                     }
                     return (
                       <label key={intent} className="flex items-center gap-2 cursor-pointer select-none group">
                         <span
-                          onClick={toggle}
-                          className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-colors cursor-pointer
-                            ${checked ? 'bg-sage-400 border-sage-400' : 'bg-white border-cream-300 group-hover:border-sage-300'}`}
+                          onClick={select}
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors cursor-pointer
+                            ${checked ? 'border-sage-400' : 'bg-white border-cream-300 group-hover:border-sage-300'}`}
                         >
-                          {checked && (
-                            <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M2 6l3 3 5-5" />
-                            </svg>
-                          )}
+                          {checked && <span className="w-2.5 h-2.5 rounded-full bg-sage-400" />}
                         </span>
                         <span className="text-sm text-stone-dark">{intent}</span>
                       </label>
@@ -253,11 +245,14 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
 
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-warm mb-3">Communication</h3>
+            {form.returning && (
+              <p className="text-xs text-stone-warm mb-3 flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-sage-400" />
+                Returning donor — gave on a previous trip
+              </p>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <Toggle label="Returning" checked={form.returning} onChange={v => set('returning', v)} />
               <Toggle label="Sent" checked={form.sent} onChange={v => set('sent', v)} />
-              <Toggle label="Letter Printed" checked={form.letterPrinted} onChange={v => set('letterPrinted', v)} />
-              <Toggle label="Envelope Printed" checked={form.mainEnvelopePrinted} onChange={v => set('mainEnvelopePrinted', v)} />
               <Toggle label="Followed Up" checked={form.followedUp} onChange={v => set('followedUp', v)} />
               <Toggle label="Thank-You Sent" checked={form.thankYouSent} onChange={v => set('thankYouSent', v)} />
             </div>

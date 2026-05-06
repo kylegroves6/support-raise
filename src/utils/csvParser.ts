@@ -31,9 +31,7 @@ const COLUMN_MAP: Record<string, keyof Contact> = {
   'Sent': 'sent',
   'Letter Address Name': 'letterAddressName',
   'Salutation': 'salutation',
-  'Letter Printed?': 'letterPrinted',
-  'Main Envelope Printed?': 'mainEnvelopePrinted',
-  'Thank-you Sent?': 'thankYouSent',
+'Thank-you Sent?': 'thankYouSent',
   'Notes': 'notes',
   'Street Address': 'streetAddress',
   'City': 'city',
@@ -54,8 +52,7 @@ const COLUMN_MAP: Record<string, keyof Contact> = {
 }
 
 const BOOL_FIELDS = new Set<keyof Contact>([
-  'returning', 'sent', 'letterPrinted', 'mainEnvelopePrinted',
-  'thankYouSent', 'followedUp', 'responded', 'financialPartner', 'prayerPartner',
+  'returning', 'sent', 'thankYouSent', 'followedUp', 'responded', 'financialPartner', 'prayerPartner',
   'pledgedToGive',
 ])
 
@@ -85,9 +82,7 @@ export function exportTemplate(): void {
     'Sent': 'No',
     'Letter Address Name': 'The Smith Family',
     'Salutation': 'John',
-    'Letter Printed?': 'No',
-    'Main Envelope Printed?': 'No',
-    'Thank-you Sent?': 'No',
+'Thank-you Sent?': 'No',
     'Notes': 'Met at church camp 2023',
     'Street Address': '123 Main St',
     'City': 'Springfield',

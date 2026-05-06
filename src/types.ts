@@ -20,9 +20,7 @@ export interface Contact {
   updatedAt?: string
   // per-trip fields — populated from contact_trips for the active trip
   sent: boolean
-  letterPrinted: boolean
-  mainEnvelopePrinted: boolean
-  thankYouSent: boolean
+thankYouSent: boolean
   followedUp: boolean
   responded: boolean
   financialPartner: boolean

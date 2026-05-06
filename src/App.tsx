@@ -11,6 +11,7 @@ import CSVImport from './components/CSVImport'
 import LoginPage from './components/LoginPage'
 import MissionSetup from './components/MissionSetup'
 import TripRollover from './components/TripRollover'
+import TripHistory from './components/TripHistory'
 import type { Contact, Trip, ImportMode } from './types'
 
 const TABS = ['Dashboard', 'Contacts'] as const
@@ -36,6 +37,7 @@ function AuthenticatedApp() {
   const [addingContact, setAddingContact] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [showRollover, setShowRollover] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const [tripMenuOpen, setTripMenuOpen] = useState(false)
   const tripMenuRef = useRef<HTMLDivElement>(null)
 
@@ -142,6 +144,12 @@ function AuthenticatedApp() {
                   >
                     New trip
                   </button>
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm text-stone-dark hover:bg-cream-100 transition-colors"
+                    onClick={() => { setTripMenuOpen(false); setShowHistory(true) }}
+                  >
+                    Trip history
+                  </button>
                   <div className="border-t border-cream-200 my-1" />
                   <button
                     className="w-full text-left px-4 py-2 text-sm text-stone-warm hover:bg-cream-100 transition-colors"
@@ -223,6 +231,10 @@ function AuthenticatedApp() {
           onRollover={handleRollover}
           onClose={() => setShowRollover(false)}
         />
+      )}
+
+      {showHistory && (
+        <TripHistory onClose={() => setShowHistory(false)} />
       )}
     </div>
   )

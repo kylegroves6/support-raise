@@ -64,8 +64,6 @@ const BULK_FIELDS: { label: string; field: keyof Contact; type: 'boolean' | 'sel
   { label: 'Prayer Partner', field: 'prayerPartner', type: 'boolean' },
   { label: 'Pledged to Give', field: 'pledgedToGive', type: 'boolean' },
   { label: 'Thank-you Sent', field: 'thankYouSent', type: 'boolean' },
-  { label: 'Letter Printed', field: 'letterPrinted', type: 'boolean' },
-  { label: 'Returning', field: 'returning', type: 'boolean' },
   { label: 'Delivery Intent', field: 'addressStatus', type: 'select', options: DELIVERY_INTENTS },
   { label: 'Relationship', field: 'relationship', type: 'select' },
 ]

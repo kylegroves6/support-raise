@@ -6,7 +6,6 @@ import type { Contact } from '../types'
 const CONTACT_CAMEL_TO_SNAKE: Record<string, string> = {
   fullName: 'full_name',
   relationship: 'relationship',
-  returning: 'returning',
   topPriority: 'top_priority',
   addressStatus: 'address_status',
   letterAddressName: 'letter_address_name',
@@ -25,8 +24,6 @@ const CONTACT_CAMEL_TO_SNAKE: Record<string, string> = {
 // Per-trip columns that live in contact_trips
 const TRIP_CAMEL_TO_SNAKE: Record<string, string> = {
   sent: 'sent',
-  letterPrinted: 'letter_printed',
-  mainEnvelopePrinted: 'main_envelope_printed',
   thankYouSent: 'thank_you_sent',
   followedUp: 'call_made',
   responded: 'responded',
@@ -41,7 +38,7 @@ const TRIP_CAMEL_TO_SNAKE: Record<string, string> = {
 type DbRow = Record<string, unknown>
 
 const TRIP_DEFAULTS = {
-  sent: false, letterPrinted: false, mainEnvelopePrinted: false, thankYouSent: false,
+  sent: false, thankYouSent: false,
   followedUp: false, responded: false, financialPartner: false, prayerPartner: false,
   pledgedToGive: false, formOfGift: '', giftAmount: 0, dateReceived: '',
 }
@@ -74,8 +71,6 @@ function fromTripRow(row: DbRow): typeof TRIP_DEFAULTS & { contactTripId: string
   return {
     contactTripId: row['id'] as string,
     sent: (row['sent'] as boolean) ?? false,
-    letterPrinted: (row['letter_printed'] as boolean) ?? false,
-    mainEnvelopePrinted: (row['main_envelope_printed'] as boolean) ?? false,
     thankYouSent: (row['thank_you_sent'] as boolean) ?? false,
     followedUp: (row['call_made'] as boolean) ?? false,
     responded: (row['responded'] as boolean) ?? false,
@@ -132,8 +127,13 @@ export function useContacts(tripId: string | null | undefined) {
         const rows = (data as DbRow[]).map(row => {
           const tripRows = row['contact_trips'] as DbRow[] | null
           const tripRow = tripRows?.find(t => t['trip_id'] === tripId)
+          // Returning = gave (financial_partner=true) on any prior trip
+          const returning = (tripRows ?? []).some(
+            t => t['trip_id'] !== tripId && t['financial_partner'] === true
+          )
           return {
             ...fromContactRow(row),
+            returning,
             ...(tripRow ? fromTripRow(tripRow) : { ...TRIP_DEFAULTS, contactTripId: undefined }),
           } as Contact
         })
