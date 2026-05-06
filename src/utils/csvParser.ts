@@ -76,7 +76,37 @@ export interface ImportDiagnostics {
 }
 
 export function exportTemplate(): void {
-  const csv = Papa.unparse([], { columns: Object.keys(COLUMN_MAP) })
+  const exampleRow: Record<string, string> = {
+    'Full Name': 'John Smith',
+    'Relationship': 'Family Friend',
+    'Returning': 'No',
+    'Top Priority': '1',
+    'Address Status': 'Confirmed',
+    'Sent': 'No',
+    'Letter Address Name': 'The Smith Family',
+    'Salutation': 'John',
+    'Letter Printed?': 'No',
+    'Main Envelope Printed?': 'No',
+    'Thank-you Sent?': 'No',
+    'Notes': 'Met at church camp 2023',
+    'Street Address': '123 Main St',
+    'City': 'Springfield',
+    'State': 'IL',
+    'Zip': '62701',
+    'Country': 'USA',
+    'Concatenated Address': '123 Main St, Springfield, IL 62701',
+    'Phone': '555-867-5309',
+    'Followed Up?': 'No',
+    'Email Address': 'john.smith@example.com',
+    'Financial Partner': 'No',
+    'Prayer Partner': 'No',
+    'Pledged to Give': 'No',
+    'Form of Gift Received': '',
+    'Gift Amount': '',
+    'Date Received': '',
+  }
+  const columns = Object.keys(COLUMN_MAP).filter(col => col !== 'Call Made?')
+  const csv = Papa.unparse([exampleRow], { columns })
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

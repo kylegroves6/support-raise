@@ -167,10 +167,12 @@ function BulkUpdatePanel({ count, onUpdate, onDelete, onClear }: BulkUpdatePanel
   )
 }
 
+
+
 function DropdownMenu({ label, items, disabled }: {
   label: string
   disabled?: boolean
-  items: { text: string; onClick: () => void; disabledWhenEmpty?: boolean }[]
+  items: { text: string; onClick: () => void }[]
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -359,13 +361,13 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
               { text: 'Download template', onClick: exportTemplate },
             ]}
           />
-          <DropdownMenu
-            label="Export"
+          <button
+            className="btn-secondary"
             disabled={contacts.length === 0}
-            items={[
-              { text: 'Export contacts CSV', onClick: () => exportCSV(contacts) },
-            ]}
-          />
+            onClick={() => exportCSV(contacts)}
+          >
+            Export
+          </button>
           <button className="btn-primary" onClick={onAdd}>+ Add Contact</button>
         </div>
       </div>
