@@ -41,6 +41,27 @@ function StatCard({ label, value, sub, color }: StatCardProps) {
   )
 }
 
+interface FractionCardProps {
+  label: string
+  numerator: number
+  denominator: number
+  remaining: number
+  color?: string
+}
+
+function FractionCard({ label, numerator, denominator, remaining, color }: FractionCardProps) {
+  const pct = denominator > 0 ? Math.round((numerator / denominator) * 100) : 0
+  return (
+    <div className="card flex flex-col gap-1">
+      <p className="text-xs font-medium uppercase tracking-wide text-stone-warm">{label}</p>
+      <p className={`text-2xl font-bold ${color || 'text-stone-dark'}`}>
+        {numerator} <span className="text-base font-medium text-stone-warm">/ {denominator}</span>
+      </p>
+      <p className="text-xs text-stone-warm">{remaining} remaining · {pct}%</p>
+    </div>
+  )
+}
+
 interface ContactRowProps {
   contact: Contact
   onEdit: (contact: Contact) => void
@@ -233,7 +254,7 @@ export default function Dashboard({
 
       <div className="card">
         <h3 className="text-sm font-semibold text-stone-dark mb-3">Gifts Received</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="rounded-lg bg-sage-50 border border-sage-100 px-4 py-3">
             <p className="text-xs font-medium uppercase tracking-wide text-sage-600 mb-1">Received</p>
             <p className="text-xl font-bold font-mono text-sage-700">{fmtAccounting(stats.totalReceived)}</p>
@@ -244,17 +265,16 @@ export default function Dashboard({
             <p className="text-xl font-bold font-mono text-amber-700">{fmtAccounting(stats.pledgedNotReceived)}</p>
             <p className="text-xs text-stone-warm mt-0.5">{stats.pledgedNotReceivedCount} {stats.pledgedNotReceivedCount === 1 ? 'person' : 'people'} committed</p>
           </div>
-          <div className="rounded-lg bg-cream-200 border border-cream-300 px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-stone-warm mb-1">Prayer Partners</p>
-            <p className="text-xl font-bold text-stone-dark">{stats.prayerPartners}</p>
-            <p className="text-xs text-stone-warm mt-0.5">supporting in prayer</p>
-          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        <StatCard label="Total Contacts" value={stats.total} />
-        <StatCard label="People Contacted" value={stats.sent} sub={`${stats.total - stats.sent} remaining`} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <FractionCard
+          label="Reached Out"
+          numerator={stats.sent}
+          denominator={stats.total}
+          remaining={stats.total - stats.sent}
+        />
         <StatCard label="Follow-Ups Made" value={stats.called} />
         <StatCard label="Partners" value={stats.partners} color="text-sage-600" />
       </div>

@@ -167,8 +167,11 @@ function BulkUpdatePanel({ count, onUpdate, onDelete, onClear }: BulkUpdatePanel
   )
 }
 
-// Dropdown for Export CSV / Download Template
-function ExportDropdown({ disabled, contacts }: { disabled: boolean; contacts: Contact[] }) {
+function DropdownMenu({ label, items, disabled }: {
+  label: string
+  disabled?: boolean
+  items: { text: string; onClick: () => void; disabledWhenEmpty?: boolean }[]
+}) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -184,28 +187,25 @@ function ExportDropdown({ disabled, contacts }: { disabled: boolean; contacts: C
     <div className="relative" ref={ref}>
       <button
         className="btn-secondary flex items-center gap-1"
+        disabled={disabled}
         onClick={() => setOpen(o => !o)}
       >
-        Export
+        {label}
         <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor">
           <path d="M6 8L2 4h8L6 8z" />
         </svg>
       </button>
       {open && (
-        <div className="absolute right-0 mt-1 w-48 bg-white border border-cream-300 rounded-lg shadow-lg z-20 py-1">
-          <button
-            className="w-full text-left px-4 py-2 text-sm text-stone-dark hover:bg-cream-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled={disabled}
-            onClick={() => { exportCSV(contacts); setOpen(false) }}
-          >
-            Export contacts CSV
-          </button>
-          <button
-            className="w-full text-left px-4 py-2 text-sm text-stone-dark hover:bg-cream-100 transition-colors"
-            onClick={() => { exportTemplate(); setOpen(false) }}
-          >
-            Download import template
-          </button>
+        <div className="absolute right-0 mt-1 w-52 bg-white border border-cream-300 rounded-lg shadow-lg z-20 py-1">
+          {items.map(item => (
+            <button
+              key={item.text}
+              className="w-full text-left px-4 py-2 text-sm text-stone-dark hover:bg-cream-100 transition-colors"
+              onClick={() => { item.onClick(); setOpen(false) }}
+            >
+              {item.text}
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -352,8 +352,20 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
           onChange={e => { setSearch(e.target.value); setPage(1) }}
         />
         <div className="flex gap-2">
-          <button className="btn-secondary" onClick={onImport}>Import CSV</button>
-          <ExportDropdown disabled={contacts.length === 0} contacts={contacts} />
+          <DropdownMenu
+            label="Import"
+            items={[
+              { text: 'Import CSV', onClick: onImport },
+              { text: 'Download template', onClick: exportTemplate },
+            ]}
+          />
+          <DropdownMenu
+            label="Export"
+            disabled={contacts.length === 0}
+            items={[
+              { text: 'Export contacts CSV', onClick: () => exportCSV(contacts) },
+            ]}
+          />
           <button className="btn-primary" onClick={onAdd}>+ Add Contact</button>
         </div>
       </div>
