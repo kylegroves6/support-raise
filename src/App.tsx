@@ -10,11 +10,10 @@ import ContactModal from './components/ContactModal'
 import CSVImport from './components/CSVImport'
 import LoginPage from './components/LoginPage'
 import MissionSetup from './components/MissionSetup'
-import NoResponsePage from './components/NoResponsePage'
 import TripRollover from './components/TripRollover'
 import type { Contact, Trip, ImportMode } from './types'
 
-const TABS = ['Dashboard', 'Contacts', 'No Response'] as const
+const TABS = ['Dashboard', 'Contacts'] as const
 type Tab = typeof TABS[number]
 
 export default function App() {
@@ -31,10 +30,6 @@ function AuthenticatedApp() {
   const { contacts, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll, deleteMany, updateMany, ensureAllContactTrips } = useContacts(activeTrip?.id)
   const { items: additionalItems, additionalTotal, addItem, updateItem, deleteItem } = useAdditionalRaising()
   const totalGoal = (activeTrip?.tripCost ?? 0) + additionalTotal
-
-  const noResponseCount = contacts.filter(
-    c => c.followedUp && !c.responded && !c.financialPartner && !c.prayerPartner
-  ).length
 
   const [tab, setTab] = useState<Tab>('Dashboard')
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
@@ -170,11 +165,6 @@ function AuthenticatedApp() {
                   onClick={() => setTab(t)}
                 >
                   {t}
-                  {t === 'No Response' && noResponseCount > 0 && (
-                    <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
-                      {noResponseCount > 9 ? '9+' : noResponseCount}
-                    </span>
-                  )}
                 </button>
               ))}
             </nav>
@@ -211,9 +201,7 @@ function AuthenticatedApp() {
             onUpdateMany={updateMany}
           />
         )}
-        {tab === 'No Response' && (
-          <NoResponsePage contacts={contacts} onEdit={contact => setEditingContact(contact)} />
-        )}
+
       </main>
 
       {(editingContact || addingContact) && (
