@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const RELATIONSHIPS = [
   "Friend's Parents", "Sumner Teacher", "Family", "Friend", "Professor",
-  "Western Other", "Family Friend", "Home", "Living Hope",
+  "Western Other", "Family Friend", "Home", "Living Hope", "CRU Staff",
 ]
 
 const ADDRESS_STATUSES = [
@@ -486,7 +486,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
                         type="checkbox"
                         className="rounded border-cream-300 accent-sage-500"
                         checked={selected.has(c.id)}
-                        onChange={() => toggleOne(c.id)}
+                        onChange={() => {}}
                       />
                     </td>
                     <td className="px-3 py-2.5 max-w-[180px]">

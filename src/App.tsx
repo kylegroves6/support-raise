@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useContacts } from './hooks/useContacts'
-import { useGoalSettings } from './hooks/useGoalSettings'
+import { useTrips } from './hooks/useTrips'
+import { useAdditionalRaising } from './hooks/useAdditionalRaising'
 import { useSession } from './lib/AuthContext'
 import { supabase } from './lib/supabase'
 import Dashboard from './components/Dashboard'
@@ -8,8 +9,10 @@ import ContactsTable from './components/ContactsTable'
 import ContactModal from './components/ContactModal'
 import CSVImport from './components/CSVImport'
 import LoginPage from './components/LoginPage'
+import MissionSetup from './components/MissionSetup'
 import NoResponsePage from './components/NoResponsePage'
-import type { Contact, ImportMode } from './types'
+import TripRollover from './components/TripRollover'
+import type { Contact, Trip, ImportMode } from './types'
 
 const TABS = ['Dashboard', 'Contacts', 'No Response'] as const
 type Tab = typeof TABS[number]
@@ -17,15 +20,17 @@ type Tab = typeof TABS[number]
 export default function App() {
   const session = useSession()
 
-  if (session === undefined) return null // loading
+  if (session === undefined) return null
   if (!session) return <LoginPage />
 
   return <AuthenticatedApp />
 }
 
 function AuthenticatedApp() {
-  const { contacts, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll, deleteMany, updateMany } = useContacts()
-  const { goals, totalGoal, updateGoals } = useGoalSettings()
+  const { activeTrip, createTrip, updateActiveTrip } = useTrips()
+  const { contacts, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll, deleteMany, updateMany, ensureAllContactTrips } = useContacts(activeTrip?.id)
+  const { items: additionalItems, additionalTotal, addItem, updateItem, deleteItem } = useAdditionalRaising()
+  const totalGoal = (activeTrip?.tripCost ?? 0) + additionalTotal
 
   const noResponseCount = contacts.filter(
     c => c.followedUp && !c.responded && !c.financialPartner && !c.prayerPartner
@@ -35,9 +40,16 @@ function AuthenticatedApp() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
   const [addingContact, setAddingContact] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [showRollover, setShowRollover] = useState(false)
 
-  function handleEditContact(contact: Contact) {
-    setEditingContact(contact)
+  // activeTrip === undefined means still loading; null means no trip yet
+  if (activeTrip === undefined) return null
+  if (activeTrip === null) {
+    return (
+      <MissionSetup
+        onSave={async updates => { await createTrip(updates) }}
+      />
+    )
   }
 
   async function handleSaveContact(data: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>) {
@@ -75,10 +87,23 @@ function AuthenticatedApp() {
     }
   }
 
+  async function handleRollover(tripData: Omit<Trip, 'id' | 'userId' | 'isActive' | 'createdAt'>) {
+    const newTrip = await createTrip(tripData)
+    await ensureAllContactTrips(newTrip.id)
+    setShowRollover(false)
+  }
+
   function closeModal() {
     setEditingContact(null)
     setAddingContact(false)
   }
+
+  const initials = activeTrip.missionName
+    .split(' ')
+    .filter(w => w.length > 0)
+    .slice(0, 2)
+    .map(w => w[0].toUpperCase())
+    .join('')
 
   return (
     <div className="min-h-screen bg-cream-100">
@@ -87,10 +112,10 @@ function AuthenticatedApp() {
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-3">
               <div className="w-7 h-7 rounded-lg bg-sage-500 flex items-center justify-center text-white text-xs font-bold">
-                T
+                {initials || '?'}
               </div>
               <div>
-                <h1 className="text-sm font-semibold text-stone-dark leading-tight">Tokyo Mission</h1>
+                <h1 className="text-sm font-semibold text-stone-dark leading-tight">{activeTrip.missionName}</h1>
                 <p className="text-xs text-stone-warm leading-tight">Support Tracker</p>
               </div>
             </div>
@@ -115,8 +140,14 @@ function AuthenticatedApp() {
                 </button>
               ))}
               <button
-                onClick={() => supabase.auth.signOut()}
+                onClick={() => setShowRollover(true)}
                 className="ml-2 px-3 py-1.5 rounded-lg text-sm font-medium text-stone-warm hover:text-stone-dark hover:bg-cream-200 transition-colors"
+              >
+                New trip
+              </button>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium text-stone-warm hover:text-stone-dark hover:bg-cream-200 transition-colors"
               >
                 Sign out
               </button>
@@ -129,16 +160,21 @@ function AuthenticatedApp() {
         {tab === 'Dashboard' && (
           <Dashboard
             contacts={contacts}
-            goals={goals}
+            activeTrip={activeTrip}
             totalGoal={totalGoal}
-            onUpdateGoals={updateGoals}
-            onEditContact={handleEditContact}
+            additionalItems={additionalItems}
+            additionalTotal={additionalTotal}
+            onUpdateTrip={updateActiveTrip}
+            onAddAdditionalItem={addItem}
+            onUpdateAdditionalItem={updateItem}
+            onDeleteAdditionalItem={deleteItem}
+            onEditContact={contact => setEditingContact(contact)}
           />
         )}
         {tab === 'Contacts' && (
           <ContactsTable
             contacts={contacts}
-            onEdit={handleEditContact}
+            onEdit={contact => setEditingContact(contact)}
             onAdd={() => setAddingContact(true)}
             onImport={() => setShowImport(true)}
             onDeleteAll={async () => {
@@ -150,10 +186,7 @@ function AuthenticatedApp() {
           />
         )}
         {tab === 'No Response' && (
-          <NoResponsePage
-            contacts={contacts}
-            onEdit={handleEditContact}
-          />
+          <NoResponsePage contacts={contacts} onEdit={contact => setEditingContact(contact)} />
         )}
       </main>
 
@@ -167,9 +200,14 @@ function AuthenticatedApp() {
       )}
 
       {showImport && (
-        <CSVImport
-          onImport={handleImport}
-          onClose={() => setShowImport(false)}
+        <CSVImport onImport={handleImport} onClose={() => setShowImport(false)} />
+      )}
+
+      {showRollover && (
+        <TripRollover
+          currentMission={activeTrip.missionName}
+          onRollover={handleRollover}
+          onClose={() => setShowRollover(false)}
         />
       )}
     </div>

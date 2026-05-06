@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import GoalSettings from './GoalSettings'
-import type { Contact, Goals } from '../types'
+import type { Contact, Trip, AdditionalRaisingItem } from '../types'
 
 function fmt(n: number): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -10,6 +10,18 @@ function fmtAccounting(n: number): string {
   const abs = Math.abs(n)
   const formatted = abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   return n < 0 ? `($${formatted})` : `$${formatted}`
+}
+
+function daysUntil(dateStr: string | null): number | null {
+  if (!dateStr) return null
+  const target = new Date(dateStr + 'T00:00:00')
+  const diff = target.getTime() - new Date().getTime()
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+}
+
+function fmtDate(dateStr: string | null): string {
+  if (!dateStr) return ''
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 interface StatCardProps {
@@ -59,13 +71,22 @@ function ContactRow({ contact, onEdit, showPledged }: ContactRowProps) {
 
 interface DashboardProps {
   contacts: Contact[]
-  goals: Goals
+  activeTrip: Trip
   totalGoal: number
-  onUpdateGoals: (updates: Partial<Goals>) => void
+  additionalItems: AdditionalRaisingItem[]
+  additionalTotal: number
+  onUpdateTrip: (updates: Partial<Omit<Trip, 'id' | 'userId' | 'isActive' | 'createdAt'>>) => Promise<void>
+  onAddAdditionalItem: (label: string, amount: number) => Promise<void>
+  onUpdateAdditionalItem: (id: string, label: string, amount: number) => Promise<void>
+  onDeleteAdditionalItem: (id: string) => Promise<void>
   onEditContact: (contact: Contact) => void
 }
 
-export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, onEditContact }: DashboardProps) {
+export default function Dashboard({
+  contacts, activeTrip, totalGoal, additionalItems,
+  onUpdateTrip, onAddAdditionalItem, onUpdateAdditionalItem, onDeleteAdditionalItem,
+  onEditContact,
+}: DashboardProps) {
   const [showGoalSettings, setShowGoalSettings] = useState(false)
 
   const stats = useMemo(() => {
@@ -113,8 +134,20 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
   }, [contacts])
 
   const pctReceived = Math.min((stats.totalReceived / totalGoal) * 100, 100)
-  const tripPct = Math.min((goals.tripCost / totalGoal) * 100, 100)
-  const foodPct = Math.min((goals.foodReimbursement / totalGoal) * 100, 100)
+  const pctRounded = Math.round(pctReceived)
+  const remaining = Math.max(totalGoal - stats.totalReceived, 0)
+  const days = daysUntil(activeTrip.missionStart)
+  const perDay = days != null && days > 0 ? remaining / days : null
+
+  // Gradient stop color based on completion
+  const barColor =
+    pctReceived >= 100
+      ? 'from-sage-500 to-sage-600'
+      : pctReceived >= 66
+      ? 'from-sage-400 to-sage-500'
+      : pctReceived >= 33
+      ? 'from-amber-400 to-sage-400'
+      : 'from-amber-500 to-amber-400'
 
   return (
     <div className="space-y-6">
@@ -122,7 +155,11 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
         <div className="flex items-start justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-stone-dark">Support Goal</h2>
-            <p className="text-sm text-stone-warm mt-0.5">Tokyo Mission Trip 2026</p>
+            {activeTrip.missionStart && (
+              <p className="text-sm text-stone-warm mt-0.5">
+                {fmtDate(activeTrip.missionStart)}{activeTrip.missionEnd ? ` – ${fmtDate(activeTrip.missionEnd)}` : ''}
+              </p>
+            )}
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold text-sage-600 font-mono">{fmtAccounting(stats.totalReceived)}</p>
@@ -130,40 +167,67 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
           </div>
         </div>
 
-        <div className="relative h-6 rounded-full bg-cream-200 overflow-hidden mb-3">
+        <div className="relative h-7 rounded-full bg-cream-200 overflow-hidden mb-2">
           <div
-            className="absolute left-0 top-0 h-full bg-sage-400 transition-all duration-500"
+            className={`absolute left-0 top-0 h-full bg-gradient-to-r ${barColor} transition-all duration-500`}
             style={{ width: `${pctReceived}%` }}
           />
-          <div
-            className="absolute top-0 bottom-0 w-px bg-white/60"
-            style={{ left: `${tripPct}%` }}
-          />
-          <div
-            className="absolute top-0 bottom-0 w-px bg-white/60"
-            style={{ left: `${tripPct + foodPct}%` }}
-          />
+          {pctReceived > 8 && (
+            <div
+              className="absolute top-0 h-full flex items-center pr-2 pointer-events-none"
+              style={{ left: 0, width: `${pctReceived}%` }}
+            >
+              <span className="ml-auto text-xs font-bold text-white drop-shadow">{pctRounded}%</span>
+            </div>
+          )}
+          {pctReceived <= 8 && pctReceived > 0 && (
+            <div
+              className="absolute top-0 h-full flex items-center pl-2 pointer-events-none"
+              style={{ left: `${pctReceived}%` }}
+            >
+              <span className="text-xs font-bold text-stone-warm">{pctRounded}%</span>
+            </div>
+          )}
         </div>
 
-        <div className="flex gap-4 text-xs text-stone-warm flex-wrap">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-warm mb-3">
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-sm bg-sage-400" />
-            <span>Trip Cost: ${fmt(goals.tripCost)}</span>
+            <span>Trip Cost: ${fmt(activeTrip.tripCost)}</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm bg-sage-300" />
-            <span>Food: ${fmt(goals.foodReimbursement)}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm bg-cream-300" />
-            <span>SF Flight: ${fmt(goals.sfFlight)}</span>
-          </div>
+          {additionalItems.map(item => (
+            <div key={item.id} className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-sm bg-amber-300" />
+              <span>{item.label}: ${fmt(item.amount)}</span>
+            </div>
+          ))}
           <button
             className="ml-auto text-sage-500 hover:text-sage-600 font-medium underline underline-offset-2 transition-colors"
             onClick={() => setShowGoalSettings(true)}
           >
             Edit goals
           </button>
+        </div>
+
+        <div className={`grid gap-3 pt-3 border-t border-cream-200 ${days != null ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+          {days != null && (
+            <div className="text-center">
+              <p className="text-2xl font-bold text-stone-dark font-mono">{days}</p>
+              <p className="text-xs text-stone-warm mt-0.5">days until departure</p>
+              {activeTrip.missionStart && <p className="text-xs text-stone-light">{fmtDate(activeTrip.missionStart)}</p>}
+            </div>
+          )}
+          <div className="text-center">
+            <p className="text-2xl font-bold font-mono text-amber-600">{fmtAccounting(remaining)}</p>
+            <p className="text-xs text-stone-warm mt-0.5">still needed</p>
+          </div>
+          {perDay != null && (
+            <div className="text-center col-span-2 sm:col-span-1">
+              <p className="text-2xl font-bold font-mono text-sage-600">${fmt(Math.ceil(perDay))}</p>
+              <p className="text-xs text-stone-warm mt-0.5">needed per day</p>
+              <p className="text-xs text-stone-light">rough projection</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -242,9 +306,12 @@ export default function Dashboard({ contacts, goals, totalGoal, onUpdateGoals, o
 
       {showGoalSettings && (
         <GoalSettings
-          goals={goals}
-          totalGoal={totalGoal}
-          onUpdate={onUpdateGoals}
+          activeTrip={activeTrip}
+          additionalItems={additionalItems}
+          onUpdateTrip={onUpdateTrip}
+          onAddItem={onAddAdditionalItem}
+          onUpdateItem={onUpdateAdditionalItem}
+          onDeleteItem={onDeleteAdditionalItem}
           onClose={() => setShowGoalSettings(false)}
         />
       )}

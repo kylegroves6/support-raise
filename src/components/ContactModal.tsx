@@ -3,7 +3,7 @@ import type { Contact } from '../types'
 
 const RELATIONSHIPS = [
   "Friend's Parents", "Sumner Teacher", "Family", "Friend", "Professor",
-  "Western Other", "Family Friend", "Home", "Living Hope",
+  "Western Other", "Family Friend", "Home", "Living Hope", "CRU Staff",
 ]
 
 const ADDRESS_STATUSES = [

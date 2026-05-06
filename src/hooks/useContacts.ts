@@ -2,18 +2,15 @@ import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Contact } from '../types'
 
-const CAMEL_TO_SNAKE: Record<keyof Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>, string> = {
+// Permanent contact columns (no per-trip fields)
+const CONTACT_CAMEL_TO_SNAKE: Record<string, string> = {
   fullName: 'full_name',
   relationship: 'relationship',
   returning: 'returning',
   topPriority: 'top_priority',
   addressStatus: 'address_status',
-  sent: 'sent',
   letterAddressName: 'letter_address_name',
   salutation: 'salutation',
-  letterPrinted: 'letter_printed',
-  mainEnvelopePrinted: 'main_envelope_printed',
-  thankYouSent: 'thank_you_sent',
   notes: 'notes',
   streetAddress: 'street_address',
   city: 'city',
@@ -22,8 +19,16 @@ const CAMEL_TO_SNAKE: Record<keyof Omit<Contact, 'id' | 'createdAt' | 'updatedAt
   country: 'country',
   concatenatedAddress: 'concatenated_address',
   phone: 'phone',
-  followedUp: 'call_made',
   email: 'email',
+}
+
+// Per-trip columns that live in contact_trips
+const TRIP_CAMEL_TO_SNAKE: Record<string, string> = {
+  sent: 'sent',
+  letterPrinted: 'letter_printed',
+  mainEnvelopePrinted: 'main_envelope_printed',
+  thankYouSent: 'thank_you_sent',
+  followedUp: 'call_made',
   responded: 'responded',
   financialPartner: 'financial_partner',
   prayerPartner: 'prayer_partner',
@@ -33,30 +38,70 @@ const CAMEL_TO_SNAKE: Record<keyof Omit<Contact, 'id' | 'createdAt' | 'updatedAt
   dateReceived: 'date_received',
 }
 
-const SNAKE_TO_CAMEL = Object.fromEntries(
-  Object.entries(CAMEL_TO_SNAKE).map(([k, v]) => [v, k])
-) as Record<string, string>
-
 type DbRow = Record<string, unknown>
 
-function toRow(contact: Partial<Contact>, userId: string): DbRow {
-  const row: DbRow = { user_id: userId }
-  for (const [camel, snake] of Object.entries(CAMEL_TO_SNAKE)) {
-    if (camel in contact) row[snake] = contact[camel as keyof Contact]
+const TRIP_DEFAULTS = {
+  sent: false, letterPrinted: false, mainEnvelopePrinted: false, thankYouSent: false,
+  followedUp: false, responded: false, financialPartner: false, prayerPartner: false,
+  pledgedToGive: false, formOfGift: '', giftAmount: 0, dateReceived: '',
+}
+
+function fromContactRow(row: DbRow): Omit<Contact, keyof typeof TRIP_DEFAULTS | 'contactTripId'> {
+  return {
+    id: row['id'] as string,
+    fullName: (row['full_name'] as string) ?? '',
+    relationship: (row['relationship'] as string) ?? '',
+    returning: (row['returning'] as boolean) ?? false,
+    topPriority: row['top_priority'] != null ? Number(row['top_priority']) : null,
+    addressStatus: (row['address_status'] as string) ?? '',
+    letterAddressName: (row['letter_address_name'] as string) ?? '',
+    salutation: (row['salutation'] as string) ?? '',
+    notes: (row['notes'] as string) ?? '',
+    streetAddress: (row['street_address'] as string) ?? '',
+    city: (row['city'] as string) ?? '',
+    state: (row['state'] as string) ?? '',
+    zip: (row['zip'] as string) ?? '',
+    country: (row['country'] as string) ?? '',
+    concatenatedAddress: (row['concatenated_address'] as string) ?? '',
+    phone: (row['phone'] as string) ?? '',
+    email: (row['email'] as string) ?? '',
+    createdAt: row['created_at'] as string | undefined,
+    updatedAt: row['updated_at'] as string | undefined,
   }
-  if (contact.id) row['id'] = contact.id
+}
+
+function fromTripRow(row: DbRow): typeof TRIP_DEFAULTS & { contactTripId: string } {
+  return {
+    contactTripId: row['id'] as string,
+    sent: (row['sent'] as boolean) ?? false,
+    letterPrinted: (row['letter_printed'] as boolean) ?? false,
+    mainEnvelopePrinted: (row['main_envelope_printed'] as boolean) ?? false,
+    thankYouSent: (row['thank_you_sent'] as boolean) ?? false,
+    followedUp: (row['call_made'] as boolean) ?? false,
+    responded: (row['responded'] as boolean) ?? false,
+    financialPartner: (row['financial_partner'] as boolean) ?? false,
+    prayerPartner: (row['prayer_partner'] as boolean) ?? false,
+    pledgedToGive: (row['pledged_to_give'] as boolean) ?? false,
+    formOfGift: (row['form_of_gift'] as string) ?? '',
+    giftAmount: row['gift_amount'] != null ? Number(row['gift_amount']) : 0,
+    dateReceived: (row['date_received'] as string) ?? '',
+  }
+}
+
+function toContactRow(data: Partial<Contact>): DbRow {
+  const row: DbRow = {}
+  for (const [camel, snake] of Object.entries(CONTACT_CAMEL_TO_SNAKE)) {
+    if (camel in data) row[snake] = data[camel as keyof Contact]
+  }
   return row
 }
 
-function fromRow(row: DbRow): Contact {
-  const contact: Partial<Contact> = {}
-  for (const [snake, camel] of Object.entries(SNAKE_TO_CAMEL)) {
-    if (snake in row) (contact as Record<string, unknown>)[camel] = row[snake]
+function toTripRow(data: Partial<Contact>): DbRow {
+  const row: DbRow = {}
+  for (const [camel, snake] of Object.entries(TRIP_CAMEL_TO_SNAKE)) {
+    if (camel in data) row[snake] = data[camel as keyof Contact]
   }
-  contact.id = row['id'] as string
-  contact.createdAt = row['created_at'] as string | undefined
-  contact.updatedAt = row['updated_at'] as string | undefined
-  return contact as Contact
+  return row
 }
 
 async function getCurrentUserId(): Promise<string> {
@@ -65,56 +110,102 @@ async function getCurrentUserId(): Promise<string> {
   return user.id
 }
 
-export function useContacts() {
+export function useContacts(tripId: string | null | undefined) {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    getCurrentUserId()
-      .then(userId =>
-        supabase
-          .from('contacts')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: true })
-      )
+    if (tripId === undefined) return // still loading trip
+    if (tripId === null) {
+      setContacts([])
+      setLoading(false)
+      return
+    }
+
+    supabase
+      .from('contacts')
+      .select(`*, contact_trips!left(*)`)
+      .order('created_at', { ascending: true })
       .then(({ data, error }) => {
-        if (error) setError(error)
-        else setContacts((data as DbRow[]).map(fromRow))
+        if (error) { setError(error); setLoading(false); return }
+        const rows = (data as DbRow[]).map(row => {
+          const tripRows = row['contact_trips'] as DbRow[] | null
+          const tripRow = tripRows?.find(t => t['trip_id'] === tripId)
+          return {
+            ...fromContactRow(row),
+            ...(tripRow ? fromTripRow(tripRow) : { ...TRIP_DEFAULTS, contactTripId: undefined }),
+          } as Contact
+        })
+        setContacts(rows)
         setLoading(false)
       })
-      .catch(err => {
-        setError(err)
-        setLoading(false)
-      })
-  }, [])
+  }, [tripId])
+
+  const ensureContactTrip = useCallback(async (contactId: string, userId: string): Promise<string> => {
+    if (!tripId) throw new Error('No active trip')
+    const { data, error } = await supabase
+      .from('contact_trips')
+      .upsert({ trip_id: tripId, contact_id: contactId, user_id: userId }, { onConflict: 'trip_id,contact_id' })
+      .select('id')
+      .single()
+    if (error) throw error
+    return (data as DbRow)['id'] as string
+  }, [tripId])
 
   const addContact = useCallback(async (data: Partial<Contact>): Promise<Contact> => {
+    if (!tripId) throw new Error('No active trip')
     const userId = await getCurrentUserId()
     const { data: created, error } = await supabase
       .from('contacts')
-      .insert(toRow(data, userId))
+      .insert({ ...toContactRow(data), user_id: userId })
       .select()
       .single()
     if (error) throw error
-    const contact = fromRow(created as DbRow)
+    const contactRow = fromContactRow(created as DbRow)
+
+    // Create contact_trips row
+    const { data: ctData, error: ctError } = await supabase
+      .from('contact_trips')
+      .insert({ trip_id: tripId, contact_id: contactRow.id, user_id: userId, ...toTripRow(data) })
+      .select()
+      .single()
+    if (ctError) throw ctError
+
+    const contact = { ...contactRow, ...fromTripRow(ctData as DbRow) }
     setContacts(prev => [...prev, contact])
     return contact
-  }, [])
+  }, [tripId])
 
   const updateContact = useCallback(async (id: string, data: Partial<Contact>): Promise<void> => {
+    if (!tripId) throw new Error('No active trip')
     const userId = await getCurrentUserId()
-    const { data: updated, error } = await supabase
-      .from('contacts')
-      .update(toRow(data, userId))
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-    const contact = fromRow(updated as DbRow)
-    setContacts(prev => prev.map(c => c.id === id ? contact : c))
-  }, [])
+
+    const contactFields = toContactRow(data)
+    const tripFields = toTripRow(data)
+
+    const [contactRes, tripRes] = await Promise.all([
+      Object.keys(contactFields).length > 0
+        ? supabase.from('contacts').update(contactFields).eq('id', id).select().single()
+        : Promise.resolve({ data: null, error: null }),
+      Object.keys(tripFields).length > 0
+        ? supabase
+            .from('contact_trips')
+            .upsert({ trip_id: tripId, contact_id: id, user_id: userId, ...tripFields }, { onConflict: 'trip_id,contact_id' })
+            .select()
+            .single()
+        : Promise.resolve({ data: null, error: null }),
+    ])
+    if (contactRes.error) throw contactRes.error
+    if (tripRes.error) throw tripRes.error
+
+    setContacts(prev => prev.map(c => {
+      if (c.id !== id) return c
+      const updatedContact = contactRes.data ? { ...c, ...fromContactRow(contactRes.data as DbRow) } : c
+      const updatedTrip = tripRes.data ? { ...updatedContact, ...fromTripRow(tripRes.data as DbRow) } : updatedContact
+      return updatedTrip
+    }))
+  }, [tripId])
 
   const deleteContact = useCallback(async (id: string): Promise<void> => {
     const { error } = await supabase.from('contacts').delete().eq('id', id)
@@ -123,56 +214,118 @@ export function useContacts() {
   }, [])
 
   const importContacts = useCallback(async (incoming: Contact[]): Promise<void> => {
+    if (!tripId) throw new Error('No active trip')
     const userId = await getCurrentUserId()
-    const { data: existing } = await supabase
-      .from('contacts')
-      .select('full_name')
-      .eq('user_id', userId)
+    const { data: existing } = await supabase.from('contacts').select('full_name').eq('user_id', userId)
     const existingNames = new Set(
-      (existing as DbRow[] | null ?? []).map(r => String(r['full_name'] ?? '').toLowerCase())
+      ((existing as DbRow[] | null) ?? []).map(r => String(r['full_name'] ?? '').toLowerCase())
     )
     const newOnes = incoming.filter(c => !existingNames.has((c.fullName ?? '').toLowerCase()))
     if (newOnes.length === 0) return
-    const rows = newOnes.map(c => toRow(c, userId))
-    const { data, error } = await supabase.from('contacts').insert(rows).select()
+
+    const { data: insertedContacts, error } = await supabase
+      .from('contacts')
+      .insert(newOnes.map(c => ({ ...toContactRow(c), user_id: userId })))
+      .select()
     if (error) throw error
-    const imported = (data as DbRow[]).map(fromRow)
+
+    const ctRows = (insertedContacts as DbRow[]).map((row, i) => ({
+      trip_id: tripId,
+      contact_id: row['id'] as string,
+      user_id: userId,
+      ...toTripRow(newOnes[i]),
+    }))
+    const { data: ctData, error: ctError } = await supabase.from('contact_trips').insert(ctRows).select()
+    if (ctError) throw ctError
+
+    const ctMap = new Map((ctData as DbRow[]).map(r => [r['contact_id'] as string, r]))
+    const imported = (insertedContacts as DbRow[]).map(row => ({
+      ...fromContactRow(row),
+      ...(ctMap.has(row['id'] as string) ? fromTripRow(ctMap.get(row['id'] as string)!) : { ...TRIP_DEFAULTS, contactTripId: undefined }),
+    } as Contact))
     setContacts(prev => [...prev, ...imported])
-  }, [])
+  }, [tripId])
 
   const replaceAll = useCallback(async (incoming: Contact[]): Promise<void> => {
+    if (!tripId) throw new Error('No active trip')
     const userId = await getCurrentUserId()
-    const { error: delError } = await supabase.from('contacts').delete().eq('user_id', userId)
-    if (delError) throw delError
-    const rows = incoming.map(c => toRow(c, userId))
-    const { data, error } = await supabase.from('contacts').insert(rows).select()
+    await supabase.from('contacts').delete().eq('user_id', userId)
+
+    const { data: insertedContacts, error } = await supabase
+      .from('contacts')
+      .insert(incoming.map(c => ({ ...toContactRow(c), user_id: userId })))
+      .select()
     if (error) throw error
-    setContacts((data as DbRow[]).map(fromRow))
-  }, [])
+
+    const ctRows = (insertedContacts as DbRow[]).map((row, i) => ({
+      trip_id: tripId,
+      contact_id: row['id'] as string,
+      user_id: userId,
+      ...toTripRow(incoming[i]),
+    }))
+    const { data: ctData, error: ctError } = await supabase.from('contact_trips').insert(ctRows).select()
+    if (ctError) throw ctError
+
+    const ctMap = new Map((ctData as DbRow[]).map(r => [r['contact_id'] as string, r]))
+    setContacts((insertedContacts as DbRow[]).map(row => ({
+      ...fromContactRow(row),
+      ...(ctMap.has(row['id'] as string) ? fromTripRow(ctMap.get(row['id'] as string)!) : { ...TRIP_DEFAULTS, contactTripId: undefined }),
+    } as Contact)))
+  }, [tripId])
 
   const deleteAll = useCallback(async (): Promise<void> => {
     const userId = await getCurrentUserId()
-    const { error } = await supabase.from('contacts').delete().eq('user_id', userId)
-    if (error) throw error
+    await supabase.from('contacts').delete().eq('user_id', userId)
     setContacts([])
   }, [])
 
   const deleteMany = useCallback(async (ids: string[]): Promise<void> => {
     if (ids.length === 0) return
-    const { error } = await supabase.from('contacts').delete().in('id', ids)
-    if (error) throw error
+    await supabase.from('contacts').delete().in('id', ids)
     setContacts(prev => prev.filter(c => !ids.includes(c.id)))
   }, [])
 
   const updateMany = useCallback(async (ids: string[], data: Partial<Contact>): Promise<void> => {
-    if (ids.length === 0) return
+    if (ids.length === 0 || !tripId) return
     const userId = await getCurrentUserId()
-    const row = toRow(data, userId)
-    delete row['user_id'] // don't overwrite user_id in bulk update
-    const { error } = await supabase.from('contacts').update(row).in('id', ids)
-    if (error) throw error
-    setContacts(prev => prev.map(c => ids.includes(c.id) ? { ...c, ...data } : c))
-  }, [])
+    const contactFields = toContactRow(data)
+    const tripFields = toTripRow(data)
 
-  return { contacts, loading, error, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll, deleteMany, updateMany }
+    if (Object.keys(contactFields).length > 0) {
+      await supabase.from('contacts').update(contactFields).in('id', ids)
+    }
+    if (Object.keys(tripFields).length > 0) {
+      // Upsert a contact_trips row for each contact
+      const upsertRows = ids.map(contactId => ({
+        trip_id: tripId,
+        contact_id: contactId,
+        user_id: userId,
+        ...tripFields,
+      }))
+      await supabase.from('contact_trips').upsert(upsertRows, { onConflict: 'trip_id,contact_id' })
+    }
+    setContacts(prev => prev.map(c => ids.includes(c.id) ? { ...c, ...data } : c))
+  }, [tripId])
+
+  // Used when ensuring all existing contacts have a contact_trips row for a newly created trip
+  const ensureAllContactTrips = useCallback(async (newTripId: string): Promise<void> => {
+    const userId = await getCurrentUserId()
+    const rows = contacts.map(c => ({
+      trip_id: newTripId,
+      contact_id: c.id,
+      user_id: userId,
+    }))
+    if (rows.length === 0) return
+    await supabase.from('contact_trips').upsert(rows, { onConflict: 'trip_id,contact_id' })
+    // Reset per-trip state in local state
+    setContacts(prev => prev.map(c => ({ ...c, ...TRIP_DEFAULTS, contactTripId: undefined })))
+  }, [contacts])
+
+  return {
+    contacts, loading, error,
+    addContact, updateContact, deleteContact,
+    importContacts, replaceAll, deleteAll, deleteMany, updateMany,
+    ensureAllContactTrips,
+    ensureContactTrip,
+  }
 }

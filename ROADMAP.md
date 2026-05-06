@@ -13,9 +13,9 @@
 
 ### Stack
 - **Database:** Supabase cloud Postgres
-- **Auth:** Supabase Auth (email/password)
+- **Auth:** Supabase Auth (email/password + Google OAuth)
 - **API layer:** `@supabase/supabase-js` called directly from React hooks
-- **RLS:** Row-level security — users only see their own data
+- **RLS:** Row-level security — full `USING` + `WITH CHECK` on all tables (`contacts`, `goals`, `additional_raising`)
 - **Types:** Full TypeScript — shared `Contact` and `Goals` interfaces in `src/types.ts`
 
 ### Env vars (`.env`)
@@ -102,7 +102,41 @@ supabase db push
 
 ---
 
-## Phase 1.5 — Activity heatmap (near-term)
+## Phase 1.5 — Vercel deployment + mission settings (near-term)
+
+### Vercel deployment
+- Add `vercel.json` with SPA rewrite rule so page refresh works on sub-routes
+- Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as Vercel environment variables
+- Add Vercel preview and production URLs to Supabase **Authentication → URL Configuration → Redirect URLs**
+- Consider separate Supabase projects for dev vs prod (or use the same project with env-var switching)
+
+### Google OAuth on Vercel
+- In Google Cloud Console → OAuth client, add the Vercel production URL to **Authorized redirect URIs** (e.g. `https://your-app.vercel.app`)
+- Add any Vercel preview URL pattern if you want OAuth to work on preview deploys too
+- Supabase already handles the callback route (`/auth/v1/callback`) — no app-side route needed
+
+### Mission settings (make the app generic)
+Pull hardcoded "Tokyo Mission" branding and dates out into a per-user settings record.
+
+**New fields on `goals` table (or a separate `mission_settings` table):**
+```sql
+ALTER TABLE goals
+  ADD COLUMN mission_name TEXT NOT NULL DEFAULT 'My Mission',
+  ADD COLUMN mission_start DATE,
+  ADD COLUMN mission_end DATE;
+```
+
+**UI changes:**
+- Add mission name, start date, and end date fields to the Goal Settings panel
+- Replace hardcoded "Tokyo Mission" text in the header/login page with the user's saved mission name
+- Dashboard can show the date range and days remaining if dates are set
+- Additional reimbursables stay as-is (already flexible)
+
+**Migration:** rename or update `goals` table to `mission_settings` if a clean separation is preferred, or just add columns to `goals` to keep it simple.
+
+---
+
+## Phase 1.6 — Activity heatmap (near-term)
 
 A GitHub-style heatmap showing outreach activity over time — how consistently you're reaching out, sending letters, following up, and logging donations.
 
@@ -180,7 +214,10 @@ If this becomes a product for other missionaries:
 - **Skipped Docker/Express entirely** — went straight to Supabase since no real data existed
 - **Keeping Vite** — right fit for personal use; reconsider Next.js only at Phase 3
 - **TypeScript** — migrated from JS in April 2026; shared `Contact`/`Goals` types catch schema mismatches at compile time
-- **Supabase URL + publishable key are not secrets** — go in `.env` directly
+- **Supabase URL + publishable key are not secrets** — go in `.env` directly and as Vercel env vars; store in Vaultwarden for reference
+- **Vaultwarden** — self-hosted password/secrets manager; store all env vars (Supabase URL, anon key, future API keys) there for recovery and sharing across machines
 - **Bitwarden Secrets Manager** — reserved for future server-side secrets (Phase 2 Anthropic API key)
 - **`returning` is a Postgres reserved word** — must be quoted as `"returning"` in SQL
 - **camelCase ↔ snake_case mapping** lives in `useContacts.ts` (`CAMEL_TO_SNAKE` / `fromRow` / `toRow`)
+- **Google OAuth + email/password share the same user** — Supabase auto-links accounts with the same email, so switching to Google doesn't orphan existing data
+- **RLS policies need `WITH CHECK`** — `USING`-only policies filter reads but not writes; all tables now use `FOR ALL USING (...) WITH CHECK (...)` to enforce ownership on inserts and updates too

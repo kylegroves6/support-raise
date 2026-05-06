@@ -5,12 +5,8 @@ export interface Contact {
   returning: boolean
   topPriority: number | null
   addressStatus: string
-  sent: boolean
   letterAddressName: string
   salutation: string
-  letterPrinted: boolean
-  mainEnvelopePrinted: boolean
-  thankYouSent: boolean
   notes: string
   streetAddress: string
   city: string
@@ -19,8 +15,15 @@ export interface Contact {
   country: string
   concatenatedAddress: string
   phone: string
-  followedUp: boolean
   email: string
+  createdAt?: string
+  updatedAt?: string
+  // per-trip fields — populated from contact_trips for the active trip
+  sent: boolean
+  letterPrinted: boolean
+  mainEnvelopePrinted: boolean
+  thankYouSent: boolean
+  followedUp: boolean
   responded: boolean
   financialPartner: boolean
   prayerPartner: boolean
@@ -28,14 +31,25 @@ export interface Contact {
   formOfGift: string
   giftAmount: number
   dateReceived: string
-  createdAt?: string
-  updatedAt?: string
+  // present when loaded with trip data
+  contactTripId?: string
 }
 
-export interface Goals {
+export interface Trip {
+  id: string
+  userId: string
+  missionName: string
+  missionStart: string | null
+  missionEnd: string | null
   tripCost: number
-  foodReimbursement: number
-  sfFlight: number
+  isActive: boolean
+  createdAt?: string
+}
+
+export interface AdditionalRaisingItem {
+  id: string
+  label: string
+  amount: number
 }
 
 export type ImportMode = 'append' | 'replace'
