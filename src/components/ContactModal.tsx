@@ -1,15 +1,28 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { Contact } from '../types'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-const RELATIONSHIPS = [
-  "Friend's Parents", "Sumner Teacher", "Family", "Friend", "Professor",
-  "Western Other", "Family Friend", "Home", "Living Hope", "CRU Staff",
+const RELATIONSHIP_SUGGESTIONS = [
+  "Family", "Friend", "Family Friend", "Friend's Parents",
+  "Church Friend", "Neighbor", "Coworker", "Coach",
+  "Teacher / Professor", "Mentor", "Community Leader", "Former Employer",
 ]
 
-const ADDRESS_STATUSES = [
-  "", "Documented", "Need to Look", "Unavailable",
-  "Contacted", "Hand Delivery", "Email", "Text",
-]
+const ADDRESS_METHOD_OPTIONS = ['Mailing Address', 'Known Email', 'Phone', 'Hand Delivery'] as const
+type AddressMethod = typeof ADDRESS_METHOD_OPTIONS[number]
+
+function parseAddressMethods(status: string): Set<AddressMethod> {
+  const set = new Set<AddressMethod>()
+  for (const part of status.split(',')) {
+    const trimmed = part.trim() as AddressMethod
+    if ((ADDRESS_METHOD_OPTIONS as readonly string[]).includes(trimmed)) set.add(trimmed)
+  }
+  return set
+}
+
+function serializeAddressMethods(methods: Set<AddressMethod>): string {
+  return ADDRESS_METHOD_OPTIONS.filter(m => methods.has(m)).join(', ')
+}
 
 const GIFT_FORMS = ["", "Online Donation", "Check", "Cash"]
 
@@ -26,6 +39,61 @@ const BLANK_CONTACT: ContactFormState = {
   concatenatedAddress: '', phone: '', followedUp: false, email: '',
   responded: false, financialPartner: false, prayerPartner: false, pledgedToGive: false,
   formOfGift: '', giftAmount: '', dateReceived: '',
+}
+
+function RelationshipCombobox({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState(value)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { setQuery(value) }, [value])
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const filtered = query.trim()
+    ? RELATIONSHIP_SUGGESTIONS.filter(r => r.toLowerCase().includes(query.toLowerCase()))
+    : RELATIONSHIP_SUGGESTIONS
+
+  function select(val: string) {
+    onChange(val)
+    setQuery(val)
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <input
+        className="input-field"
+        value={query}
+        placeholder="Type or choose…"
+        onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-cream-200 rounded-xl shadow-modal overflow-hidden">
+          <div className="max-h-48 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#c4b5a8_transparent] [&::-webkit-scrollbar]:block [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-light">
+            {filtered.map(r => (
+              <button
+                key={r}
+                type="button"
+                className={`w-full text-left px-3 py-1.5 text-sm transition-colors hover:bg-sage-50 hover:text-sage-700 ${value === r ? 'text-sage-700 font-medium' : 'text-stone-dark'}`}
+                onMouseDown={e => { e.preventDefault(); select(r) }}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 interface ToggleProps {
@@ -101,10 +169,7 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
                 <input className="input-field" value={form.fullName} onChange={e => set('fullName', e.target.value)} />
               </Field>
               <Field label="Relationship">
-                <select className="input-field" value={form.relationship} onChange={e => set('relationship', e.target.value)}>
-                  <option value="">— Select —</option>
-                  {RELATIONSHIPS.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
+                <RelationshipCombobox value={form.relationship} onChange={v => set('relationship', v)} />
               </Field>
               <Field label="Letter Address Name">
                 <input className="input-field" value={form.letterAddressName} onChange={e => set('letterAddressName', e.target.value)} />
@@ -127,31 +192,52 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
 
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-warm mb-3">Address</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="Address Status">
-                <select className="input-field" value={form.addressStatus} onChange={e => set('addressStatus', e.target.value)}>
-                  {ADDRESS_STATUSES.map(s => <option key={s} value={s}>{s || '— Unknown —'}</option>)}
-                </select>
-              </Field>
-              <Field label="Street Address">
-                <input className="input-field" value={form.streetAddress} onChange={e => set('streetAddress', e.target.value)} />
-              </Field>
-              <Field label="City">
-                <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} />
-              </Field>
-              <Field label={form.country && form.country.toLowerCase() !== 'us' && form.country.toLowerCase() !== 'usa' && form.country !== '' ? 'County / Region' : 'State'}>
-                <input className="input-field" value={form.state} onChange={e => set('state', e.target.value)} />
-              </Field>
-              <Field label={form.country && form.country.toLowerCase() !== 'us' && form.country.toLowerCase() !== 'usa' && form.country !== '' ? 'Postcode' : 'Zip'}>
-                <input className="input-field" value={form.zip} onChange={e => set('zip', e.target.value)} />
-              </Field>
-              <Field label="Country">
-                <input className="input-field" placeholder="Leave blank for US" value={form.country} onChange={e => set('country', e.target.value)} />
-              </Field>
-              <Field label="Concatenated Address">
-                <input className="input-field" value={form.concatenatedAddress} onChange={e => set('concatenatedAddress', e.target.value)} />
-              </Field>
-            </div>
+            {(() => {
+              const methods = parseAddressMethods(form.addressStatus)
+              function toggleMethod(m: AddressMethod) {
+                const next = new Set(methods)
+                if (next.has(m)) next.delete(m); else next.add(m)
+                set('addressStatus', serializeAddressMethods(next))
+              }
+              const hasMailingAddress = methods.has('Mailing Address')
+              const isNonUS = form.country && form.country.toLowerCase() !== 'us' && form.country.toLowerCase() !== 'usa' && form.country !== ''
+              return (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-4">
+                    {ADDRESS_METHOD_OPTIONS.map(m => (
+                      <label key={m} className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          className="rounded border-cream-300 accent-sage-500 w-4 h-4"
+                          checked={methods.has(m)}
+                          onChange={() => toggleMethod(m)}
+                        />
+                        <span className="text-sm text-stone-dark">{m}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {hasMailingAddress && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 pl-1 border-l-2 border-cream-200">
+                      <Field label="Street Address">
+                        <input className="input-field" value={form.streetAddress} onChange={e => set('streetAddress', e.target.value)} />
+                      </Field>
+                      <Field label="City">
+                        <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} />
+                      </Field>
+                      <Field label={isNonUS ? 'County / Region' : 'State'}>
+                        <input className="input-field" value={form.state} onChange={e => set('state', e.target.value)} />
+                      </Field>
+                      <Field label={isNonUS ? 'Postcode' : 'Zip'}>
+                        <input className="input-field" value={form.zip} onChange={e => set('zip', e.target.value)} />
+                      </Field>
+                      <Field label="Country">
+                        <input className="input-field" placeholder="Leave blank for US" value={form.country} onChange={e => set('country', e.target.value)} />
+                      </Field>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </section>
 
           <section>
@@ -179,9 +265,15 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
               <Field label="Form of Gift">
-                <select className="input-field" value={form.formOfGift} onChange={e => set('formOfGift', e.target.value)}>
-                  {GIFT_FORMS.map(g => <option key={g} value={g}>{g || '— None —'}</option>)}
-                </select>
+                <Select value={form.formOfGift} onValueChange={v => set('formOfGift', v === '__none__' ? '' : v)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="— None —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
+                    {GIFT_FORMS.filter(Boolean).map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Gift Amount">
                 <div className="relative">

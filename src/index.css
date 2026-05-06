@@ -73,3 +73,29 @@
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
   }
 }
+
+/* Override Radix UI's hard-coded scrollbar:none on select viewports */
+[data-radix-select-viewport] {
+  scrollbar-width: thin !important;
+  scrollbar-color: #c4b5a8 transparent !important;
+  -ms-overflow-style: auto !important;
+}
+
+[data-radix-select-viewport]::-webkit-scrollbar {
+  display: block !important;
+  width: 6px;
+}
+
+[data-radix-select-viewport]::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+[data-radix-select-viewport]::-webkit-scrollbar-thumb {
+  background-color: #c4b5a8;
+  border-radius: 9999px;
+}
+
+[data-radix-select-viewport]::-webkit-scrollbar-thumb:hover {
+  background-color: #8c7b6e;
+}

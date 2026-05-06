@@ -1,17 +1,9 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { exportCSV, exportTemplate } from '../utils/csvParser'
 import type { Contact } from '../types'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-const RELATIONSHIPS = [
-  "Friend's Parents", "Sumner Teacher", "Family", "Friend", "Professor",
-  "Western Other", "Family Friend", "Home", "Living Hope", "CRU Staff",
-]
-
-const ADDRESS_STATUSES = [
-  "Documented", "Need to Look", "Unavailable",
-  "Contacted", "Hand Delivery", "Email", "Text",
-]
+const ADDRESS_METHODS = ['Mailing Address', 'Known Email', 'Phone', 'Hand Delivery']
 
 type ChipColor = 'green' | 'amber' | 'red' | 'blue' | 'gray' | 'cream'
 
@@ -74,18 +66,19 @@ const BULK_FIELDS: { label: string; field: keyof Contact; type: 'boolean' | 'sel
   { label: 'Thank-you Sent', field: 'thankYouSent', type: 'boolean' },
   { label: 'Letter Printed', field: 'letterPrinted', type: 'boolean' },
   { label: 'Returning', field: 'returning', type: 'boolean' },
-  { label: 'Address Status', field: 'addressStatus', type: 'select', options: ADDRESS_STATUSES },
-  { label: 'Relationship', field: 'relationship', type: 'select', options: RELATIONSHIPS },
+  { label: 'Address Status', field: 'addressStatus', type: 'select', options: ADDRESS_METHODS },
+  { label: 'Relationship', field: 'relationship', type: 'select' },
 ]
 
 interface BulkUpdatePanelProps {
   count: number
+  relationshipOptions: string[]
   onUpdate: (field: keyof Contact, value: boolean | string) => void
   onDelete: () => void
   onClear: () => void
 }
 
-function BulkUpdatePanel({ count, onUpdate, onDelete, onClear }: BulkUpdatePanelProps) {
+function BulkUpdatePanel({ count, relationshipOptions, onUpdate, onDelete, onClear }: BulkUpdatePanelProps) {
   const [field, setField] = useState<string>('')
   const [value, setValue] = useState<string>('')
 
@@ -136,7 +129,7 @@ function BulkUpdatePanel({ count, onUpdate, onDelete, onClear }: BulkUpdatePanel
               <SelectValue placeholder="Value" />
             </SelectTrigger>
             <SelectContent>
-              {selected.options!.map(o => (
+              {(selected.options ?? (selected.field === 'relationship' ? relationshipOptions : [])).map(o => (
                 <SelectItem key={o} value={o}>{o}</SelectItem>
               ))}
             </SelectContent>
@@ -225,6 +218,10 @@ interface Props {
 }
 
 export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDeleteAll, onDeleteMany, onUpdateMany }: Props) {
+  const relationshipOptions = useMemo(() =>
+    [...new Set(contacts.map(c => c.relationship).filter(Boolean))].sort() as string[]
+  , [contacts])
+
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<Filters>({
     relationship: '',
@@ -265,7 +262,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
     }
 
     if (filters.relationship) rows = rows.filter(c => c.relationship === filters.relationship)
-    if (filters.addressStatus) rows = rows.filter(c => c.addressStatus === filters.addressStatus)
+    if (filters.addressStatus) rows = rows.filter(c => (c.addressStatus || '').split(',').map(s => s.trim()).includes(filters.addressStatus))
     if (filters.sent !== '') rows = rows.filter(c => c.sent === (filters.sent === 'true'))
     if (filters.followedUp !== '') rows = rows.filter(c => c.followedUp === (filters.followedUp === 'true'))
     if (filters.partner === 'financial') rows = rows.filter(c => c.financialPartner)
@@ -381,18 +378,19 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
               <SelectValue placeholder="All Relationships" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">All Relationships</SelectItem>
-              {RELATIONSHIPS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+              <SelectItem value="__all__" className="font-medium text-stone-dark">All Relationships</SelectItem>
+              {relationshipOptions.length > 0 && <SelectSeparator />}
+              {relationshipOptions.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <Select value={filters.addressStatus} onValueChange={v => setFilter('addressStatus', v === '__all__' ? '' : v)}>
-            <SelectTrigger className="w-auto min-w-[140px] h-8 text-xs">
-              <SelectValue placeholder="All Address Status" />
+            <SelectTrigger className="w-auto min-w-[150px] h-8 text-xs">
+              <SelectValue placeholder="All Contact Methods" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">All Address Status</SelectItem>
-              {ADDRESS_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              <SelectItem value="__all__">All Contact Methods</SelectItem>
+              {ADDRESS_METHODS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
 
@@ -453,6 +451,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
       {selected.size > 0 && (
         <BulkUpdatePanel
           count={selected.size}
+          relationshipOptions={relationshipOptions}
           onUpdate={handleBulkUpdate}
           onDelete={handleBulkDelete}
           onClear={() => setSelected(new Set())}
@@ -514,12 +513,11 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
                       )}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
-                      {c.addressStatus && (
-                        <Chip
-                          label={c.addressStatus}
-                          color={c.addressStatus === 'Documented' ? 'green' : c.addressStatus === 'Unavailable' ? 'red' : 'cream'}
-                        />
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {(c.addressStatus || '').split(',').map(s => s.trim()).filter(Boolean).map(m => (
+                          <Chip key={m} label={m === 'Mailing Address' ? 'Mail' : m === 'Known Email' ? 'Email' : m === 'Hand Delivery' ? 'In Person' : m} color={m === 'Mailing Address' ? 'green' : 'cream'} />
+                        ))}
+                      </div>
                     </td>
                     <td className="px-3 py-2.5 min-w-[140px]">
                       <div className="flex flex-wrap gap-1">
