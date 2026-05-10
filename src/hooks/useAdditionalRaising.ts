@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { getCurrentUserId } from '../lib/auth'
 import type { AdditionalRaisingItem } from '../types'
 
 type DbRow = { id: string; label: string; amount: number }
@@ -12,14 +13,16 @@ export function useAdditionalRaising() {
   const [items, setItems] = useState<AdditionalRaisingItem[]>([])
 
   useEffect(() => {
-    supabase
-      .from('additional_raising')
-      .select('id, label, amount')
-      .order('created_at')
-      .then(({ data, error }) => {
-        if (error) console.error(error)
-        if (data) setItems((data as DbRow[]).map(fromDb))
-      })
+    getCurrentUserId().then(userId =>
+      supabase
+        .from('additional_raising')
+        .select('id, label, amount')
+        .eq('user_id', userId)
+        .order('created_at')
+    ).then(({ data, error }) => {
+      if (error) console.error(error)
+      if (data) setItems((data as DbRow[]).map(fromDb))
+    })
   }, [])
 
   const addItem = useCallback(async (label: string, amount: number) => {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { getCurrentUserId } from '../lib/auth'
 import type { Trip } from '../types'
 
 type DbTripRow = {
@@ -26,22 +27,18 @@ function fromDb(row: DbTripRow): Trip {
   }
 }
 
-async function getCurrentUserId(): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
-  return user.id
-}
-
 export function useTrips() {
   const [activeTrip, setActiveTrip] = useState<Trip | null | undefined>(undefined)
 
   useEffect(() => {
-    supabase
-      .from('trips')
-      .select('*')
-      .eq('is_active', true)
-      .maybeSingle()
-      .then(({ data, error }) => {
+    getCurrentUserId().then(userId =>
+      supabase
+        .from('trips')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle()
+    ).then(({ data, error }) => {
         if (error) console.error(error)
         setActiveTrip(data ? fromDb(data as DbTripRow) : null)
       })

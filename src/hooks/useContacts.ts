@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { getCurrentUserId } from '../lib/auth'
 import type { Contact } from '../types'
 
 // Permanent contact columns (no per-trip fields)
@@ -48,7 +49,7 @@ function fromContactRow(row: DbRow): Omit<Contact, keyof typeof TRIP_DEFAULTS | 
     id: row['id'] as string,
     fullName: (row['full_name'] as string) ?? '',
     relationship: (row['relationship'] as string) ?? '',
-    returning: (row['returning'] as boolean) ?? false,
+    returning: false,
     topPriority: row['top_priority'] != null ? Number(row['top_priority']) : null,
     addressStatus: (row['address_status'] as string) ?? '',
     letterAddressName: (row['letter_address_name'] as string) ?? '',
@@ -99,12 +100,6 @@ function toTripRow(data: Partial<Contact>): DbRow {
   return row
 }
 
-async function getCurrentUserId(): Promise<string> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
-  return user.id
-}
-
 export function useContacts(tripId: string | null | undefined) {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
@@ -118,11 +113,13 @@ export function useContacts(tripId: string | null | undefined) {
       return
     }
 
+    getCurrentUserId().then(userId =>
     supabase
       .from('contacts')
       .select(`*, contact_trips!left(*)`)
+      .eq('user_id', userId)
       .order('created_at', { ascending: true })
-      .then(({ data, error }) => {
+    ).then(({ data, error }) => {
         if (error) { setError(error); setLoading(false); return }
         const rows = (data as DbRow[]).map(row => {
           const tripRows = row['contact_trips'] as DbRow[] | null
@@ -249,13 +246,31 @@ export function useContacts(tripId: string | null | undefined) {
   const replaceAll = useCallback(async (incoming: Contact[]): Promise<void> => {
     if (!tripId) throw new Error('No active trip')
     const userId = await getCurrentUserId()
+
+    // Snapshot existing data so we can restore it if the subsequent insert fails
+    const { data: existingContacts } = await supabase
+      .from('contacts')
+      .select(`*, contact_trips!left(*)`)
+      .eq('user_id', userId)
+    const backup = existingContacts as DbRow[] | null
+
     await supabase.from('contacts').delete().eq('user_id', userId)
 
     const { data: insertedContacts, error } = await supabase
       .from('contacts')
       .insert(incoming.map(c => ({ ...toContactRow(c), user_id: userId })))
       .select()
-    if (error) throw error
+    if (error) {
+      // Restore backup to avoid data loss
+      if (backup && backup.length > 0) {
+        const restoreRows = backup.map(r => {
+          const { contact_trips: _, ...contactCols } = r as DbRow & { contact_trips: unknown }
+          return contactCols
+        })
+        await supabase.from('contacts').insert(restoreRows)
+      }
+      throw error
+    }
 
     const ctRows = (insertedContacts as DbRow[]).map((row, i) => ({
       trip_id: tripId,

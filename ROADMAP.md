@@ -1,11 +1,15 @@
 # Support Raising Tracker — Roadmap
 
-## Current State (v0.5 — April 2026)
+## Current State (v0.5 — May 2026)
 
 - Vite + React + TypeScript + Tailwind SPA
 - Supabase for database (Postgres), auth, and RLS
 - No server-side component — Supabase JS client called directly from React hooks
 - Supabase CLI linked for migrations (`supabase db push`, `supabase db query --linked`)
+- Deployed to Vercel; installable as PWA on iOS/Android home screen
+
+### Known UI Issues (mobile polish backlog)
+- Some UI elements don't flow well on small screens when installed as a PWA — layout review needed
 
 ---
 

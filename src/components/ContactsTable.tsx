@@ -57,9 +57,8 @@ interface Filters {
 }
 
 const BULK_FIELDS: { label: string; field: keyof Contact; type: 'boolean' | 'select'; options?: string[] }[] = [
-  { label: 'Sent', field: 'sent', type: 'boolean' },
+  { label: 'Contacted', field: 'sent', type: 'boolean' },
   { label: 'Followed Up', field: 'followedUp', type: 'boolean' },
-  { label: 'Responded', field: 'responded', type: 'boolean' },
   { label: 'Financial Partner', field: 'financialPartner', type: 'boolean' },
   { label: 'Prayer Partner', field: 'prayerPartner', type: 'boolean' },
   { label: 'Pledged to Give', field: 'pledgedToGive', type: 'boolean' },
@@ -393,13 +392,13 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
           </Select>
 
           <Select value={filters.sent} onValueChange={v => setFilter('sent', v === '__all__' ? '' : v)}>
-            <SelectTrigger className="w-auto min-w-[110px] h-8 text-xs">
-              <SelectValue placeholder="Sent?" />
+            <SelectTrigger className="w-auto min-w-[120px] h-8 text-xs">
+              <SelectValue placeholder="Contacted?" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">Any</SelectItem>
-              <SelectItem value="true">Sent</SelectItem>
-              <SelectItem value="false">Not Sent</SelectItem>
+              <SelectItem value="true">Contacted</SelectItem>
+              <SelectItem value="false">Not Contacted</SelectItem>
             </SelectContent>
           </Select>
 
@@ -523,9 +522,8 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
                     </td>
                     <td className="px-3 py-2.5 min-w-[140px]">
                       <div className="flex flex-wrap gap-1">
-                        {c.sent && <Chip label="Sent" color="blue" />}
+                        {c.sent && <Chip label="Contacted" color="blue" />}
                         {c.followedUp && <Chip label="Followed Up" color="green" />}
-                        {c.responded && !c.financialPartner && !c.prayerPartner && <Chip label="Responded" color="amber" />}
                         {c.financialPartner && <Chip label="Partner" color="green" />}
                         {c.prayerPartner && <Chip label="Prayer" color="cream" />}
                         {c.pledgedToGive && !c.financialPartner && <Chip label="Pledged" color="amber" />}

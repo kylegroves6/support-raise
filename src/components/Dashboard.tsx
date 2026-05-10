@@ -270,7 +270,7 @@ export default function Dashboard({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <FractionCard
-          label="Reached Out"
+          label="Contacted"
           numerator={stats.sent}
           denominator={stats.total}
           remaining={stats.total - stats.sent}
@@ -282,7 +282,7 @@ export default function Dashboard({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ActionList
           title="Follow Up Now"
-          description="Sent — follow-up to make"
+          description="Contacted — follow-up to make"
           items={lists.followUpNow}
           onEdit={onEditContact}
           emptyMsg="No follow-ups pending"
@@ -291,7 +291,7 @@ export default function Dashboard({
         />
         <ActionList
           title="No Contact Method"
-          description="Sent — no phone or email on file"
+          description="Contacted — no phone or email on file"
           items={lists.noContactMethod}
           onEdit={onEditContact}
           emptyMsg="Everyone has a contact method"
@@ -300,7 +300,7 @@ export default function Dashboard({
         />
         <ActionList
           title="Reach Out Next"
-          description="Not yet sent, by priority"
+          description="Not yet contacted, by priority"
           items={lists.reachOutNext}
           onEdit={onEditContact}
           emptyMsg="All contacts reached"

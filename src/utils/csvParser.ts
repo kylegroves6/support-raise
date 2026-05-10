@@ -1,5 +1,4 @@
 import Papa from 'papaparse'
-import { v4 as uuidv4 } from 'uuid'
 import type { Contact } from '../types'
 
 const BOOL_TRUE = new Set(['yes', 'true', '1'])
@@ -180,7 +179,7 @@ export function parseCSV(csvText: string): { contacts: Contact[]; diagnostics: I
       continue
     }
 
-    contacts.push({ id: uuidv4(), ...mapped } as Contact)
+    contacts.push({ ...mapped } as Contact)
   }
 
   return {

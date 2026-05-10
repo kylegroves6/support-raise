@@ -15,11 +15,9 @@ const CARRIED_OVER = [
 ]
 
 const RESET_FIELDS = [
-  'Letters sent',
-  'Letter & envelope printed',
+  'Contacted',
   'Thank-you sent',
   'Follow-up made',
-  'Responded',
   'Financial / prayer partner',
   'Pledged to give',
   'Gift amount & date',
