@@ -34,6 +34,7 @@ exports/
 .env
 .env.*
 !.env.example
+!.env.test
 
 # Claude Code memory
 memory/

@@ -150,6 +150,20 @@ export function useContacts(tripId: string | null | undefined) {
     return (data as DbRow)['id'] as string
   }, [tripId])
 
+  const logEvent = useCallback(async (
+    userId: string,
+    contactId: string,
+    eventType: 'contact_added' | 'sent' | 'follow_up' | 'gift' | 'thank_you',
+    occurredAt?: string,
+  ): Promise<void> => {
+    await supabase.from('activity_log').insert({
+      user_id: userId,
+      contact_id: contactId,
+      event_type: eventType,
+      ...(occurredAt ? { occurred_at: occurredAt } : {}),
+    })
+  }, [])
+
   const addContact = useCallback(async (data: Partial<Contact>): Promise<Contact> => {
     if (!tripId) throw new Error('No active trip')
     const userId = await getCurrentUserId()
@@ -171,8 +185,9 @@ export function useContacts(tripId: string | null | undefined) {
 
     const contact = { ...contactRow, ...fromTripRow(ctData as DbRow) }
     setContacts(prev => [...prev, contact])
+    void logEvent(userId, contact.id, 'contact_added', contact.createdAt?.split('T')[0])
     return contact
-  }, [tripId])
+  }, [tripId, logEvent])
 
   const updateContact = useCallback(async (id: string, data: Partial<Contact>): Promise<void> => {
     if (!tripId) throw new Error('No active trip')
@@ -202,7 +217,19 @@ export function useContacts(tripId: string | null | undefined) {
       const updatedTrip = tripRes.data ? { ...updatedContact, ...fromTripRow(tripRes.data as DbRow) } : updatedContact
       return updatedTrip
     }))
-  }, [tripId])
+
+    // Log relevant trip field changes
+    if (tripRes.data) {
+      const row = tripRes.data as DbRow
+      if (data.sent === true) void logEvent(userId, id, 'sent')
+      if (data.followedUp === true) void logEvent(userId, id, 'follow_up')
+      if (data.thankYouSent === true) void logEvent(userId, id, 'thank_you')
+      if (data.financialPartner === true || (data.giftAmount != null && data.giftAmount > 0)) {
+        const dateReceived = (row['date_received'] as string | null) ?? undefined
+        void logEvent(userId, id, 'gift', dateReceived || undefined)
+      }
+    }
+  }, [tripId, logEvent])
 
   const deleteContact = useCallback(async (id: string): Promise<void> => {
     const { error } = await supabase.from('contacts').delete().eq('id', id)
@@ -241,37 +268,23 @@ export function useContacts(tripId: string | null | undefined) {
       ...(ctMap.has(row['id'] as string) ? fromTripRow(ctMap.get(row['id'] as string)!) : { ...TRIP_DEFAULTS, contactTripId: undefined }),
     } as Contact))
     setContacts(prev => [...prev, ...imported])
-  }, [tripId])
+    for (const row of insertedContacts as DbRow[]) {
+      void logEvent(userId, row['id'] as string, 'contact_added', (row['created_at'] as string | null)?.split('T')[0])
+    }
+  }, [tripId, logEvent])
 
   const replaceAll = useCallback(async (incoming: Contact[]): Promise<void> => {
     if (!tripId) throw new Error('No active trip')
     const userId = await getCurrentUserId()
 
-    // Snapshot existing data so we can restore it if the subsequent insert fails
-    const { data: existingContacts } = await supabase
-      .from('contacts')
-      .select(`*, contact_trips!left(*)`)
-      .eq('user_id', userId)
-    const backup = existingContacts as DbRow[] | null
-
-    await supabase.from('contacts').delete().eq('user_id', userId)
-
+    // Insert new contacts first — if this fails, existing data is untouched
     const { data: insertedContacts, error } = await supabase
       .from('contacts')
       .insert(incoming.map(c => ({ ...toContactRow(c), user_id: userId })))
       .select()
-    if (error) {
-      // Restore backup to avoid data loss
-      if (backup && backup.length > 0) {
-        const restoreRows = backup.map(r => {
-          const { contact_trips: _, ...contactCols } = r as DbRow & { contact_trips: unknown }
-          return contactCols
-        })
-        await supabase.from('contacts').insert(restoreRows)
-      }
-      throw error
-    }
+    if (error) throw error
 
+    // Insert contact_trips for new contacts — still before any deletion
     const ctRows = (insertedContacts as DbRow[]).map((row, i) => ({
       trip_id: tripId,
       contact_id: row['id'] as string,
@@ -279,7 +292,16 @@ export function useContacts(tripId: string | null | undefined) {
       ...toTripRow(incoming[i]),
     }))
     const { data: ctData, error: ctError } = await supabase.from('contact_trips').insert(ctRows).select()
-    if (ctError) throw ctError
+    if (ctError) {
+      // Roll back the contacts we just inserted
+      const newIds = (insertedContacts as DbRow[]).map(r => r['id'] as string)
+      await supabase.from('contacts').delete().in('id', newIds)
+      throw ctError
+    }
+
+    // All new data is safely written — now delete the old contacts
+    const newIds = new Set((insertedContacts as DbRow[]).map(r => r['id'] as string))
+    await supabase.from('contacts').delete().eq('user_id', userId).not('id', 'in', `(${[...newIds].join(',')})`)
 
     const ctMap = new Map((ctData as DbRow[]).map(r => [r['contact_id'] as string, r]))
     setContacts((insertedContacts as DbRow[]).map(row => ({

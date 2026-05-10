@@ -21,6 +21,23 @@ function parseIntVal(val: string | undefined): number | null {
   return isNaN(n) ? null : n
 }
 
+// Normalizes date strings to YYYY-MM-DD. Handles:
+//   M/D/YY and M/D/YYYY (slash-delimited, US order)
+//   YYYY-MM-DD (already correct — pass through)
+// Anything unrecognized is returned as empty string.
+export function normalizeDateString(val: string | undefined): string {
+  if (!val || val.trim() === '') return ''
+  const s = val.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/)
+  if (slashMatch) {
+    const [, m, d, y] = slashMatch
+    const year = y.length === 2 ? `20${y}` : y
+    return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+  }
+  return ''
+}
+
 const COLUMN_MAP: Record<string, keyof Contact> = {
   'Full Name': 'fullName',
   'Relationship': 'relationship',
@@ -71,7 +88,7 @@ export interface ImportDiagnostics {
   papaParseErrors: Papa.ParseError[]
 }
 
-export function exportTemplate(): void {
+export function buildTemplateCSV(): string {
   const exampleRow: Record<string, string> = {
     'Full Name': 'John Smith',
     'Relationship': 'Family Friend',
@@ -81,7 +98,7 @@ export function exportTemplate(): void {
     'Sent': 'No',
     'Letter Address Name': 'The Smith Family',
     'Salutation': 'John',
-'Thank-you Sent?': 'No',
+    'Thank-you Sent?': 'No',
     'Notes': 'Met at church camp 2023',
     'Street Address': '123 Main St',
     'City': 'Springfield',
@@ -100,7 +117,11 @@ export function exportTemplate(): void {
     'Date Received': '',
   }
   const columns = Object.keys(COLUMN_MAP).filter(col => col !== 'Call Made?')
-  const csv = Papa.unparse([exampleRow], { columns })
+  return Papa.unparse([exampleRow], { columns })
+}
+
+export function exportTemplate(): void {
+  const csv = buildTemplateCSV()
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -110,7 +131,7 @@ export function exportTemplate(): void {
   URL.revokeObjectURL(url)
 }
 
-export function exportCSV(contacts: Contact[]): void {
+export function buildExportCSV(contacts: Contact[]): string {
   const rows = contacts.map(c => {
     const row: Record<string, string> = {}
     for (const [field, csvCol] of Object.entries(COLUMN_MAP_INVERSE)) {
@@ -118,16 +139,17 @@ export function exportCSV(contacts: Contact[]): void {
       const val = c[key]
       if (BOOL_FIELDS.has(key)) {
         row[csvCol] = val ? 'Yes' : 'No'
-      } else if (key === 'giftAmount') {
-        row[csvCol] = val != null ? String(val) : ''
       } else {
         row[csvCol] = val != null ? String(val) : ''
       }
     }
     return row
   })
+  return Papa.unparse(rows, { columns: Object.keys(COLUMN_MAP) })
+}
 
-  const csv = Papa.unparse(rows, { columns: Object.keys(COLUMN_MAP) })
+export function exportCSV(contacts: Contact[]): void {
+  const csv = buildExportCSV(contacts)
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -158,12 +180,15 @@ export function parseCSV(csvText: string): { contacts: Contact[]; diagnostics: I
     const mapped: Partial<Contact> = {}
 
     for (const [csvCol, field] of Object.entries(COLUMN_MAP)) {
+      if (!(csvCol in row)) continue
       const val = row[csvCol]
       try {
         if (field === 'topPriority') {
           mapped[field] = parseIntVal(val)
         } else if (field === 'giftAmount') {
           mapped[field] = parseGiftAmount(val)
+        } else if (field === 'dateReceived') {
+          mapped[field] = normalizeDateString(val)
         } else if (BOOL_FIELDS.has(field)) {
           (mapped as Record<string, boolean>)[field] = parseBool(val)
         } else {
