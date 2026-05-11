@@ -64,41 +64,74 @@ Core CRUD, auth, RLS, trips, goals, CSV import/export, additional raising items.
 
 ---
 
-## Phase 2 — Print + AI (next)
+## Pre-Phase 2 hardening (next — must complete before Phase 2 features)
+
+### ContactModal fixes
+- Move Organization field up directly after Last Name (context when no last name exists)
+- Email format validation (inline error, blocks save)
+- Phone format validation (lenient — US + international)
+- If gift amount > 0: require Form of Gift, Date Received, and either Financial Partner or Pledged to Give
+- If Financial Partner checked: auto-set Contacted = true
+- Country → searchable select with fixed list, default United States
+
+### Relationship field — constrained list
+- Replace free-text combobox with enforced select + "Add new…" escape hatch
+- Consistent values required for AI letter drafting to produce consistent tone
+- Also enables relationship breakdown reporting (Phase 2/3)
+
+### Testing gate
+- Unit tests for all new validation logic
+- E2E tests for gift amount / partner status flows
+- Property-based fuzz testing with `fast-check` targeting `csvParser.ts`
+  (`normalizeDateString`, `parseGiftAmount`, legacy name split)
+- All 72 existing tests must keep passing; Playwright must stay green
+
+---
+
+## Phase 2 — Print + AI
 
 ### Couple / family contact model
-Currently a couple like "Cam and Lilly Raines" has to be entered with one person's name split
-awkwardly. Options to explore:
-- Add a `display_name` override field — shown instead of `firstName + lastName` everywhere
-- Use `organization` for couples/families ("Raines Family", "Kevin & Sue Smith")
-  and leave `firstName`/`lastName` as the primary contact person
-- Salutation already handles the letter greeting; envelope addressing is the main gap
-Decision: defer to letter formatter design — whichever approach makes envelope lines clean wins.
+- Use `organization` for couples/families ("Kevin & Sue Smith", "Raines Family")
+- `firstName`/`lastName` = primary contact person; `salutation` = letter greeting
+- Full envelope addressing design deferred to letter formatter
 
 ### Letter and envelope formatter
-- Print-ready letter layout: contact name, address block, body, signature
+- Three output formats: mailed letter (one-page), email, text/SMS
+- Mailed letter: address block, salutation, body sections, signature
+- Pre-structured sections user can lock/unlock: opening, personal connection, ask, closing
+- Tone controls: formality slider, warmth, length
 - Salutation handling for couples/families ("Dear Kevin and Sue," / "Dear Smith Family,")
 - Envelope print layout: return address + recipient address block
 - Thank-you note formatter (same pipeline, different template)
 
 ### AI writing assistant
 - Claude API via Supabase Edge Function (keeps API key server-side)
-- Inputs: trip details, contact name, relationship, stage (pre-send / follow-up / thank-you), notes
-- Outputs: letter draft, email draft, call script bullets
-- User always reviews and edits — AI assists structure/tone only
+- Inputs: trip details, contact name, relationship, stage (pre-send / follow-up / thank-you), notes, output format, tone settings
+- Relationship field used to calibrate tone/phrasing — requires consistent values (enforced in pre-Phase 2)
+- User always reviews and edits — AI drafts structure/tone, never writes the final copy
 - Anthropic API key stored in Bitwarden Secrets Manager, injected into Edge Function env
+
+### Relationship breakdown report
+- Pie/bar chart: gift dollars received broken down by relationship category
+- Useful personal insight; more valuable at coach/org level (Phase 3)
+- Requires consistent relationship values — blocked on constrained list (pre-Phase 2)
 
 ### Quick-add contact form
 - Minimal inline form in ContactsTable (name + relationship only) for fast list-building
 - Needs: active trip ID at insert time, surface DB errors to user, Supabase mock for tests
+
+### Activity heatmap on Dashboard
+- Built and removed in Phase 1.6 (ActivityChart.tsx exists, just not rendered)
+- Revisit here alongside print/AI features
+- 52-week rolling heatmap, CSS grid, hover tooltip by event type
 
 ### Change data capture (old/new values in activity_log)
 Add `old_value JSONB` and `new_value JSONB` to `activity_log`.
 Deferred: single-user app has no audit conflict risk yet. Do this when Phase 3 ships.
 
 ### Multiple follow-ups
-`call_made` is boolean — one follow-up per trip. When letter formatting workflow is clearer,
-decide: count column vs. deriving count from `activity_log` events.
+`call_made` is boolean — one follow-up per trip. Decide: count column vs. repeated
+`activity_log` events when letter formatting workflow is clearer.
 
 ---
 
