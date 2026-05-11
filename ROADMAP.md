@@ -7,8 +7,11 @@
 - No server-side component — Supabase JS client called directly from React hooks
 - Supabase CLI linked for migrations
 - Deployed to Vercel; installable as PWA on iOS/Android home screen
-- 159 unit tests passing (csvParser, useContacts, contactValidation, csvParser.property)
-- Playwright E2E: 10 golden-path tests green against local Supabase
+- 162 unit tests passing (csvParser, useContacts, contactValidation, csvParser.property)
+- Playwright E2E: 11 golden-path tests green against local Supabase
+- GitHub Actions CI: runs unit + E2E on every push against a fresh local Supabase stack
+- `supabase/seed.sql` provides deterministic baseline (test user + 4 contacts + active trip)
+- Playwright `globalSetup` runs `supabase db reset --local` before each suite — no manual cleanup needed
 - Sentry initialized with Session Replay (`VITE_SENTRY_DSN` env var — add to Vercel)
 - `activity_log` table live in production, accumulating data
 - Phase 2 security hardening complete: npm audit clean, RLS audited, CSP header, eslint-plugin-security, phone normalization, E2E trip/goal tests
@@ -42,10 +45,13 @@ Core CRUD, auth, RLS, trips, goals, CSV import/export, additional raising items.
 - ✅ Vercel deployment with SPA rewrite rule
 - ✅ PWA support
 - ✅ Google OAuth + email/password auth
-- ✅ Vitest unit tests (72 passing)
-- ✅ Playwright E2E: 5 golden-path tests green against local Supabase
+- ✅ Vitest unit tests (162 passing)
+- ✅ Playwright E2E: 11 golden-path tests green against local Supabase
 - ✅ `.env.example` documents all required env vars
-- ⬜ Gate Vercel preview deploys on Playwright passing in CI
+- ✅ GitHub Actions CI: unit + E2E on every push to `main`
+- ✅ `supabase/seed.sql`: deterministic test baseline; `globalSetup` resets DB before each E2E run
+- ✅ `npm run dev:local`: dev server pointed at local Supabase for offline development
+- ⬜ Gate Vercel preview deploys on CI green
 
 ---
 

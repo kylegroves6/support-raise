@@ -1,6 +1,6 @@
 # Support Raising Tracker — Audit & Remediation Plan
 **Originally audited:** 2026-05-10  
-**Last updated:** 2026-05-10 (post Phase 2 security hardening)
+**Last updated:** 2026-05-10 (CI pipeline + seed infrastructure added)
 
 ---
 
@@ -53,8 +53,11 @@ Clean, well-reasoned codebase. Safe for personal use today. Needs targeted fixes
 `@typescript-eslint` wired in for all `.ts`/`.tsx` files. `eslint-plugin-security` also added. 0 errors.
 
 ### C2. Tests — ✅ Done.
-- 159 Vitest unit tests passing across 4 files (csvParser, useContacts, contactValidation, property/fuzz)
-- 10 Playwright E2E tests passing against local Supabase
+- 162 Vitest unit tests passing across 4 files (csvParser, useContacts, contactValidation, property/fuzz)
+- 11 Playwright E2E tests passing against local Supabase
+- GitHub Actions CI runs both suites on every push to `main` against a fresh local Supabase stack
+- `supabase/seed.sql` provides a deterministic baseline (test user + 8 realistic contacts + active trip)
+- Playwright `globalSetup` runs `supabase db reset --local` before each E2E suite — no manual cleanup needed
 
 ### C3. Remove orphaned `NoResponsePage.tsx`
 **File:** `src/components/NoResponsePage.tsx`

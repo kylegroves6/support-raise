@@ -58,6 +58,60 @@ App runs at http://localhost:5173. Sign up for an account on first visit.
 npm run dev
 ```
 
+The default `npm run dev` points at the **cloud** Supabase project (`.env`). If the cloud project is paused or you want to work offline, use local Supabase instead (see below).
+
+---
+
+## Local development with Supabase
+
+To run the full stack locally (no cloud dependency):
+
+**1. Start the local Supabase Docker stack:**
+```bash
+supabase start
+```
+
+**2. Seed the database:**
+```bash
+supabase db reset --local
+```
+This applies all migrations and loads `supabase/seed.sql`, which creates the test user and four sample contacts.
+
+**3. Run the dev server pointed at local Supabase:**
+```bash
+npm run dev:local
+```
+App runs at `http://localhost:5173`. Sign in with:
+- **Email:** `playwright@example.com`
+- **Password:** `playwright-test-pw!`
+
+**To stop:**
+```bash
+supabase stop
+```
+
+> Data added during a local session is wiped the next time you run `supabase db reset --local`. This is intentional — the local stack is for development and testing, not persistent data.
+
+---
+
+## Testing
+
+**Unit tests (162):**
+```bash
+npm test -- --run
+```
+
+**E2E tests (11 Playwright tests against local Supabase):**
+```bash
+# Supabase must be running first
+supabase start
+
+npm run test:e2e
+```
+The Playwright suite automatically runs `supabase db reset --local` before starting (via `globalSetup`), so the database is always in a clean seed state regardless of what a prior run left behind. You do not need to run `db reset` manually before E2E tests.
+
+**CI:** GitHub Actions runs both test suites on every push to `main` (see `.github/workflows/ci.yml`). The workflow starts its own local Supabase stack — no cloud credentials needed.
+
 ---
 
 ## Importing contacts
