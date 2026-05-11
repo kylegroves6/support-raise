@@ -153,16 +153,28 @@ supabase db push
 │   │   ├── ContactModal.tsx      # Add / edit contact form
 │   │   ├── CSVImport.tsx         # Import modal with diagnostics
 │   │   ├── GoalSettings.tsx      # Trip cost / goal editor
+│   │   ├── TripHistory.tsx       # Past trips list
+│   │   ├── TripRollover.tsx      # Create new trip UI
+│   │   ├── RelationshipSelect.tsx # Constrained relationship combobox
 │   │   └── LoginPage.tsx         # Supabase Auth sign-in / sign-up
 │   ├── hooks/
 │   │   ├── useContacts.ts        # Supabase CRUD + camelCase↔snake_case mapping
+│   │   ├── useTrips.ts           # Trip create/select/history
+│   │   ├── useAdditionalRaising.ts # Additional raising items CRUD
+│   │   ├── useActivityLog.ts     # Activity log reads (follow-up chip)
 │   │   └── useGoalSettings.ts    # Goals upsert
 │   ├── lib/
 │   │   ├── supabase.ts           # Supabase client
 │   │   └── AuthContext.tsx       # Session provider
 │   └── utils/
-│       └── csvParser.ts          # CSV import / export logic
-├── supabase/                     # Supabase CLI config (linked project)
+│       ├── csvParser.ts          # CSV import / export + phone/date normalization
+│       └── contactValidation.ts  # Field validation (email, phone, gift rules)
+├── e2e/                          # Playwright E2E tests
+├── supabase/
+│   ├── migrations/               # All schema changes — never apply DDL outside this
+│   ├── seed.sql                  # Deterministic test baseline for local dev + CI
+│   └── config.toml               # Supabase CLI project config
+├── .github/workflows/ci.yml      # GitHub Actions: unit + E2E on every push to main
 ├── .env.example                  # Env template — copy to .env
 ├── tsconfig.json
 ├── vite.config.ts
@@ -184,5 +196,6 @@ supabase db push
 
 | Phase | What |
 |-------|------|
-| 2 | AI writing assistant — email drafts, call scripts, thank-you notes via Claude API + Supabase Edge Function |
-| 3 | SaaS / multi-user — Stripe billing, org-level isolation, configurable project name |
+| 2 | Multi-user readiness — quick-add contact form, relationship breakdown report, branch protection, activity heatmap |
+| 2.5 | AI writing assistant — email drafts, call scripts, thank-you notes via Claude API + Supabase Edge Function |
+| 3 | SaaS / multi-user — Stripe billing, org-level isolation, coach dashboard |

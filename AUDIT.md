@@ -1,6 +1,6 @@
 # Support Raising Tracker — Audit & Remediation Plan
 **Originally audited:** 2026-05-10  
-**Last updated:** 2026-05-10 (CI pipeline + seed infrastructure added)
+**Last updated:** 2026-05-10 (CI pipeline + seed infrastructure added; migration history repaired; code pushed to main)
 
 ---
 
@@ -58,6 +58,7 @@ Clean, well-reasoned codebase. Safe for personal use today. Needs targeted fixes
 - GitHub Actions CI runs both suites on every push to `main` against a fresh local Supabase stack
 - `supabase/seed.sql` provides a deterministic baseline (test user + 8 realistic contacts + active trip)
 - Playwright `globalSetup` runs `supabase db reset --local` before each E2E suite — no manual cleanup needed
+- **Next step:** Enable GitHub branch protection on `main` — require `test` job to pass before any push or merge lands. See ROADMAP Phase 1.5 for details.
 
 ### C3. Remove orphaned `NoResponsePage.tsx`
 **File:** `src/components/NoResponsePage.tsx`

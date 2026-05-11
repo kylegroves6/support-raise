@@ -23,13 +23,10 @@ Every schema change must:
 3. Applied only via `supabase db push` or the Supabase MCP tool
 4. Run `supabase migration list` before any push to verify local/remote are in sync
 
-**Known drift:** Remote has an orphan migration `20260510192920` (activity_log applied
-out-of-band). It is identical to local `20260510002000_add_activity_log.sql`. No action
-needed — schema is correct, just the migration history record is duplicated on remote.
+**Known drift (cosmetic only):** Remote has three orphan entries (`20260510192920`, `20260510215326`, `20260511012902`) from migrations that were applied out-of-band during the Phase 1.6 split-name work. Their SQL is identical to the corresponding local migrations. Local/remote schema is fully in sync — `supabase db push` is safe. No action needed.
 
 ### Known issues / tech debt
-- `full_name` column dropped in migration `20260510004000` — complete. No action needed.
-- Remote migration list has the orphan `20260510192920` entry — cosmetic only.
+- Remote migration list has three orphan entries — cosmetic only (see Migration hygiene note above).
 - Small-screen PWA layout not fully reviewed.
 
 ---
@@ -51,7 +48,8 @@ Core CRUD, auth, RLS, trips, goals, CSV import/export, additional raising items.
 - ✅ GitHub Actions CI: unit + E2E on every push to `main`
 - ✅ `supabase/seed.sql`: deterministic test baseline; `globalSetup` resets DB before each E2E run
 - ✅ `npm run dev:local`: dev server pointed at local Supabase for offline development
-- ⬜ Gate Vercel preview deploys on CI green
+- ⬜ **Branch protection on `main`** — require `test` CI job to pass before any push or PR merge lands. Set up in GitHub → Settings → Branches → Add ruleset. Why: direct pushes currently bypass CI; becomes critical before opening to more users.
+- ⬜ Gate Vercel preview deploys on CI green (add Vercel GitHub integration check to the same branch ruleset)
 
 ---
 
