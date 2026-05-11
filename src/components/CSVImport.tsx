@@ -105,7 +105,7 @@ export default function CSVImport({ onImport, onClose }: Props) {
                       {diagnostics && diagnostics.skipped > 0 && ` (${diagnostics.skipped} rows skipped)`}
                     </p>
                     <p className="text-xs text-stone-warm mt-0.5">
-                      {preview.slice(0, 3).map(c => c.fullName).filter(Boolean).join(', ')}
+                      {preview.slice(0, 3).map(c => c.organization || `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim()).filter(Boolean).join(', ')}
                       {preview.length > 3 ? ` and ${preview.length - 3} more…` : ''}
                     </p>
                   </div>

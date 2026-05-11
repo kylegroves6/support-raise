@@ -39,15 +39,19 @@ export function normalizeDateString(val: string | undefined): string {
 }
 
 const COLUMN_MAP: Record<string, keyof Contact> = {
-  'Full Name': 'fullName',
+  // New split-name columns (preferred)
+  'First Name': 'firstName',
+  'Last Name': 'lastName',
+  'Organization': 'organization',
+  // Legacy column — backwards compat for old exports
+  'Full Name': 'firstName',
   'Relationship': 'relationship',
   'Returning': 'returning',
   'Top Priority': 'topPriority',
   'Address Status': 'addressStatus',
   'Sent': 'sent',
-  'Letter Address Name': 'letterAddressName',
   'Salutation': 'salutation',
-'Thank-you Sent?': 'thankYouSent',
+  'Thank-you Sent?': 'thankYouSent',
   'Notes': 'notes',
   'Street Address': 'streetAddress',
   'City': 'city',
@@ -72,9 +76,6 @@ const BOOL_FIELDS = new Set<keyof Contact>([
   'pledgedToGive',
 ])
 
-const COLUMN_MAP_INVERSE = Object.fromEntries(
-  Object.entries(COLUMN_MAP).map(([csvCol, field]) => [field, csvCol])
-) as Record<keyof Contact, string>
 
 export interface ImportDiagnostics {
   totalRows: number
@@ -90,13 +91,14 @@ export interface ImportDiagnostics {
 
 export function buildTemplateCSV(): string {
   const exampleRow: Record<string, string> = {
-    'Full Name': 'John Smith',
+    'First Name': 'John',
+    'Last Name': 'Smith',
+    'Organization': '',
     'Relationship': 'Family Friend',
     'Returning': 'No',
     'Top Priority': '1',
     'Address Status': 'Confirmed',
     'Sent': 'No',
-    'Letter Address Name': 'The Smith Family',
     'Salutation': 'John',
     'Thank-you Sent?': 'No',
     'Notes': 'Met at church camp 2023',
@@ -116,7 +118,7 @@ export function buildTemplateCSV(): string {
     'Gift Amount': '',
     'Date Received': '',
   }
-  const columns = Object.keys(COLUMN_MAP).filter(col => col !== 'Call Made?')
+  const columns = Object.keys(COLUMN_MAP).filter(col => col !== 'Call Made?' && col !== 'Full Name')
   return Papa.unparse([exampleRow], { columns })
 }
 
@@ -131,10 +133,14 @@ export function exportTemplate(): void {
   URL.revokeObjectURL(url)
 }
 
+// Export columns (canonical new format — no legacy Full Name header)
+const EXPORT_COLUMNS = Object.keys(COLUMN_MAP).filter(col => col !== 'Call Made?' && col !== 'Full Name')
+
 export function buildExportCSV(contacts: Contact[]): string {
   const rows = contacts.map(c => {
     const row: Record<string, string> = {}
-    for (const [field, csvCol] of Object.entries(COLUMN_MAP_INVERSE)) {
+    for (const [csvCol, field] of Object.entries(COLUMN_MAP)) {
+      if (csvCol === 'Call Made?' || csvCol === 'Full Name') continue
       const key = field as keyof Contact
       const val = c[key]
       if (BOOL_FIELDS.has(key)) {
@@ -145,7 +151,7 @@ export function buildExportCSV(contacts: Contact[]): string {
     }
     return row
   })
-  return Papa.unparse(rows, { columns: Object.keys(COLUMN_MAP) })
+  return Papa.unparse(rows, { columns: EXPORT_COLUMNS })
 }
 
 export function exportCSV(contacts: Contact[]): void {
@@ -166,7 +172,11 @@ export function parseCSV(csvText: string): { contacts: Contact[]; diagnostics: I
   })
 
   const detectedHeaders = result.meta?.fields ?? []
-  const expectedHeaders = Object.keys(COLUMN_MAP)
+  const hasLegacyFormat = detectedHeaders.includes('Full Name') && !detectedHeaders.includes('First Name')
+  const expectedHeaders = Object.keys(COLUMN_MAP).filter(h => {
+    if (hasLegacyFormat) return h !== 'First Name' && h !== 'Last Name' && h !== 'Organization'
+    return h !== 'Full Name' && h !== 'Call Made?'
+  })
   const missingHeaders = expectedHeaders.filter(h => !detectedHeaders.includes(h))
   const unmappedHeaders = detectedHeaders.filter(h => !COLUMN_MAP[h])
 
@@ -179,8 +189,12 @@ export function parseCSV(csvText: string): { contacts: Contact[]; diagnostics: I
     const row = rows[i]
     const mapped: Partial<Contact> = {}
 
+    // Track whether legacy Full Name column was present (needs splitting)
+    const hasLegacyFullName = 'Full Name' in row && !('First Name' in row)
+
     for (const [csvCol, field] of Object.entries(COLUMN_MAP)) {
       if (!(csvCol in row)) continue
+      if (csvCol === 'Full Name' && !hasLegacyFullName) continue
       const val = row[csvCol]
       try {
         if (field === 'topPriority') {
@@ -199,7 +213,14 @@ export function parseCSV(csvText: string): { contacts: Contact[]; diagnostics: I
       }
     }
 
-    if (!mapped.fullName && !mapped.relationship) {
+    // Split legacy Full Name into firstName / lastName
+    if (hasLegacyFullName && mapped.firstName) {
+      const parts = (mapped.firstName as string).split(' ')
+      mapped.firstName = parts[0]
+      if (!mapped.lastName) mapped.lastName = parts.slice(1).join(' ')
+    }
+
+    if (!mapped.firstName && !mapped.lastName && !mapped.organization && !mapped.relationship) {
       skippedRows.push(i + 2)
       continue
     }

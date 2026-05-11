@@ -1,11 +1,12 @@
 export interface Contact {
   id: string
-  fullName: string
+  firstName: string
+  lastName: string
+  organization?: string
   relationship: string
   returning: boolean
   topPriority: number | null
   addressStatus: string
-  letterAddressName: string
   salutation: string
   notes: string
   streetAddress: string

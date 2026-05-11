@@ -29,8 +29,8 @@ type ContactFormState = Omit<Contact, 'id' | 'topPriority' | 'giftAmount' | 'cre
 }
 
 const BLANK_CONTACT: ContactFormState = {
-  fullName: '', relationship: '', returning: false, topPriority: '',
-  addressStatus: '', sent: false, letterAddressName: '', salutation: '',
+  firstName: '', lastName: '', organization: '', relationship: '', returning: false, topPriority: '',
+  addressStatus: '', sent: false, salutation: '',
   thankYouSent: false,
   notes: '', streetAddress: '', city: '', state: '', zip: '', country: '',
   concatenatedAddress: '', phone: '', followedUp: false, email: '',
@@ -115,10 +115,10 @@ function Toggle({ label, checked, onChange }: ToggleProps) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="label">{label}</label>
+    <label className="block">
+      <span className="label">{label}</span>
       {children}
-    </div>
+    </label>
   )
 }
 
@@ -138,7 +138,14 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
   )
 
   function set<K extends keyof ContactFormState>(key: K, val: ContactFormState[K]) {
-    setForm(f => ({ ...f, [key]: val }))
+    setForm(f => {
+      const next = { ...f, [key]: val }
+      // Auto-populate salutation from first name when adding a new contact and salutation is blank
+      if (key === 'firstName' && isNew && !f.salutation) {
+        next.salutation = val as string
+      }
+      return next
+    })
   }
 
   function handleSave() {
@@ -150,10 +157,10 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
 
   return (
     <div className="fixed inset-0 bg-stone-dark/40 flex items-start justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-modal w-full max-w-2xl my-8">
+      <div role="dialog" aria-modal="true" className="bg-white rounded-2xl shadow-modal w-full max-w-2xl my-8">
         <div className="flex items-center justify-between px-6 py-4 border-b border-cream-200">
           <h2 className="text-lg font-semibold text-stone-dark">
-            {isNew ? 'Add Contact' : form.fullName || 'Edit Contact'}
+            {isNew ? 'Add Contact' : [form.firstName, form.lastName].filter(Boolean).join(' ') || form.organization || 'Edit Contact'}
           </h2>
           <button onClick={onClose} className="btn-ghost text-stone-warm text-xl leading-none">×</button>
         </div>
@@ -162,27 +169,30 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
           <section>
             <h3 className="text-xs font-semibold uppercase tracking-widest text-stone-warm mb-3">Contact Info</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field label="Full Name">
-                <input className="input-field" value={form.fullName} onChange={e => set('fullName', e.target.value)} />
+              <Field label="First Name">
+                <input className="input-field" value={form.firstName} onChange={e => set('firstName', e.target.value)} />
+              </Field>
+              <Field label="Last Name">
+                <input className="input-field" value={form.lastName} onChange={e => set('lastName', e.target.value)} />
+              </Field>
+              <Field label="Organization (optional)">
+                <input className="input-field" value={form.organization ?? ''} onChange={e => set('organization', e.target.value)} />
               </Field>
               <Field label="Relationship">
                 <RelationshipCombobox value={form.relationship} onChange={v => set('relationship', v)} />
               </Field>
-              <Field label="Letter Address Name">
-                <input className="input-field" value={form.letterAddressName} onChange={e => set('letterAddressName', e.target.value)} />
-              </Field>
               <Field label="Salutation">
                 <input className="input-field" value={form.salutation} onChange={e => set('salutation', e.target.value)} />
+              </Field>
+              <Field label="Top Priority (1=highest)">
+                <input className="input-field" type="number" min="1" max="3" placeholder="1–3 or blank"
+                  value={form.topPriority} onChange={e => set('topPriority', e.target.value)} />
               </Field>
               <Field label="Email">
                 <input className="input-field" type="email" value={form.email} onChange={e => set('email', e.target.value)} />
               </Field>
               <Field label="Phone">
                 <input className="input-field" type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} />
-              </Field>
-              <Field label="Top Priority (1=highest)">
-                <input className="input-field" type="number" min="1" max="3" placeholder="1–3 or blank"
-                  value={form.topPriority} onChange={e => set('topPriority', e.target.value)} />
               </Field>
             </div>
           </section>
@@ -310,7 +320,7 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
             {!isNew && (
               <button
                 className="text-sm text-red-400 hover:text-red-600 transition-colors"
-                onClick={() => { if (window.confirm(`Delete ${form.fullName}?`)) onDelete(contact.id) }}
+                onClick={() => { if (window.confirm(`Delete ${[form.firstName, form.lastName].filter(Boolean).join(' ') || 'this contact'}?`)) onDelete(contact.id) }}
               >
                 Delete contact
               </button>

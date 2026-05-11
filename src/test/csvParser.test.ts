@@ -2,7 +2,17 @@ import { describe, it, expect } from 'vitest'
 import { parseCSV, buildTemplateCSV, buildExportCSV, normalizeDateString } from '../utils/csvParser'
 import type { Contact } from '../types'
 
+// New-format headers (split name)
 const ALL_HEADERS = [
+  'First Name', 'Last Name', 'Organization', 'Relationship', 'Returning', 'Top Priority', 'Address Status',
+  'Sent', 'Salutation', 'Thank-you Sent?', 'Notes',
+  'Street Address', 'City', 'State', 'Zip', 'Country', 'Concatenated Address',
+  'Phone', 'Followed Up?', 'Email Address', 'Financial Partner', 'Prayer Partner',
+  'Pledged to Give', 'Form of Gift Received', 'Gift Amount', 'Date Received',
+]
+
+// Legacy-format headers (old Full Name column)
+const LEGACY_HEADERS = [
   'Full Name', 'Relationship', 'Returning', 'Top Priority', 'Address Status',
   'Sent', 'Letter Address Name', 'Salutation', 'Thank-you Sent?', 'Notes',
   'Street Address', 'City', 'State', 'Zip', 'Country', 'Concatenated Address',
@@ -11,6 +21,38 @@ const ALL_HEADERS = [
 ]
 
 function makeRow(overrides: Record<string, string> = {}): Record<string, string> {
+  return {
+    'First Name': 'Jane',
+    'Last Name': 'Doe',
+    'Organization': '',
+    'Relationship': 'Church Friend',
+    'Returning': 'No',
+    'Top Priority': '',
+    'Address Status': 'Confirmed',
+    'Sent': 'No',
+    'Salutation': 'Jane',
+    'Thank-you Sent?': 'No',
+    'Notes': '',
+    'Street Address': '123 Main St',
+    'City': 'Springfield',
+    'State': 'IL',
+    'Zip': '62701',
+    'Country': 'USA',
+    'Concatenated Address': '',
+    'Phone': '555-1234',
+    'Followed Up?': 'No',
+    'Email Address': 'jane@example.com',
+    'Financial Partner': 'No',
+    'Prayer Partner': 'No',
+    'Pledged to Give': 'No',
+    'Form of Gift Received': '',
+    'Gift Amount': '',
+    'Date Received': '',
+    ...overrides,
+  }
+}
+
+function makeLegacyRow(overrides: Record<string, string> = {}): Record<string, string> {
   return {
     'Full Name': 'Jane Doe',
     'Relationship': 'Church Friend',
@@ -51,13 +93,37 @@ function buildCSV(rows: Record<string, string>[], headers = ALL_HEADERS): string
 
 describe('parseCSV', () => {
   it('happy path: parses a valid row into a contact', () => {
-    const csv = buildCSV([makeRow({ 'Full Name': 'John Smith', 'Relationship': 'Family' })])
+    const csv = buildCSV([makeRow({ 'First Name': 'John', 'Last Name': 'Smith', 'Relationship': 'Family' })])
     const { contacts, diagnostics } = parseCSV(csv)
     expect(contacts).toHaveLength(1)
-    expect(contacts[0].fullName).toBe('John Smith')
+    expect(contacts[0].firstName).toBe('John')
+    expect(contacts[0].lastName).toBe('Smith')
     expect(contacts[0].relationship).toBe('Family')
     expect(diagnostics.imported).toBe(1)
     expect(diagnostics.skipped).toBe(0)
+  })
+
+  describe('legacy Full Name backwards compat', () => {
+    it('splits Full Name into firstName + lastName', () => {
+      const csv = buildCSV([makeLegacyRow({ 'Full Name': 'John Smith' })], LEGACY_HEADERS)
+      const { contacts } = parseCSV(csv)
+      expect(contacts[0].firstName).toBe('John')
+      expect(contacts[0].lastName).toBe('Smith')
+    })
+
+    it('handles single-word Full Name (no last name)', () => {
+      const csv = buildCSV([makeLegacyRow({ 'Full Name': 'Cher' })], LEGACY_HEADERS)
+      const { contacts } = parseCSV(csv)
+      expect(contacts[0].firstName).toBe('Cher')
+      expect(contacts[0].lastName).toBe('')
+    })
+
+    it('handles Full Name with multiple spaces (first word = first, rest = last)', () => {
+      const csv = buildCSV([makeLegacyRow({ 'Full Name': 'Mary Ann Jones' })], LEGACY_HEADERS)
+      const { contacts } = parseCSV(csv)
+      expect(contacts[0].firstName).toBe('Mary')
+      expect(contacts[0].lastName).toBe('Ann Jones')
+    })
   })
 
   describe('boolean field parsing', () => {
@@ -86,8 +152,8 @@ describe('parseCSV', () => {
     ])('%s field parses Yes/No', (csvCol, field) => {
       const yesCSV = buildCSV([makeRow({ [csvCol]: 'Yes' })])
       const noCSV = buildCSV([makeRow({ [csvCol]: 'No' })])
-      expect((parseCSV(yesCSV).contacts[0] as Record<string, unknown>)[field]).toBe(true)
-      expect((parseCSV(noCSV).contacts[0] as Record<string, unknown>)[field]).toBe(false)
+      expect((parseCSV(yesCSV).contacts[0] as unknown as Record<string, unknown>)[field]).toBe(true)
+      expect((parseCSV(noCSV).contacts[0] as unknown as Record<string, unknown>)[field]).toBe(false)
     })
   })
 
@@ -121,25 +187,31 @@ describe('parseCSV', () => {
   })
 
   describe('row skipping', () => {
-    it('skips a row with no fullName and no relationship', () => {
+    it('skips a row with no name and no relationship', () => {
       const csv = buildCSV([
-        makeRow({ 'Full Name': 'Valid Person', 'Relationship': 'Friend' }),
-        makeRow({ 'Full Name': '', 'Relationship': '' }),
+        makeRow({ 'First Name': 'Valid', 'Last Name': 'Person', 'Relationship': 'Friend' }),
+        makeRow({ 'First Name': '', 'Last Name': '', 'Organization': '', 'Relationship': '' }),
       ])
       const { contacts, diagnostics } = parseCSV(csv)
       expect(contacts).toHaveLength(1)
       expect(diagnostics.skipped).toBe(1)
-      expect(diagnostics.skippedRows).toContain(3) // row 2 in data = line 3 in file
+      expect(diagnostics.skippedRows).toContain(3)
     })
 
-    it('keeps a row that has a relationship but no fullName', () => {
-      const csv = buildCSV([makeRow({ 'Full Name': '', 'Relationship': 'Friend' })])
+    it('keeps a row that has a relationship but no name', () => {
+      const csv = buildCSV([makeRow({ 'First Name': '', 'Last Name': '', 'Relationship': 'Friend' })])
       const { contacts } = parseCSV(csv)
       expect(contacts).toHaveLength(1)
     })
 
-    it('keeps a row that has a fullName but no relationship', () => {
-      const csv = buildCSV([makeRow({ 'Full Name': 'Solo Name', 'Relationship': '' })])
+    it('keeps a row that has a first name but no relationship', () => {
+      const csv = buildCSV([makeRow({ 'First Name': 'Solo', 'Relationship': '' })])
+      const { contacts } = parseCSV(csv)
+      expect(contacts).toHaveLength(1)
+    })
+
+    it('keeps a row that has only an organization', () => {
+      const csv = buildCSV([makeRow({ 'First Name': '', 'Last Name': '', 'Organization': 'Acme Corp', 'Relationship': '' })])
       const { contacts } = parseCSV(csv)
       expect(contacts).toHaveLength(1)
     })
@@ -162,7 +234,7 @@ describe('parseCSV', () => {
     })
 
     it('diagnostics.imported matches contacts length', () => {
-      const csv = buildCSV([makeRow(), makeRow({ 'Full Name': 'Second Person' })])
+      const csv = buildCSV([makeRow(), makeRow({ 'First Name': 'Second', 'Last Name': 'Person' })])
       const { contacts, diagnostics } = parseCSV(csv)
       expect(diagnostics.imported).toBe(contacts.length)
     })
@@ -192,10 +264,11 @@ describe('parseCSV', () => {
 })
 
 describe('buildTemplateCSV', () => {
-  it('produces a CSV with the expected header columns', () => {
+  it('produces a CSV with First Name / Last Name columns', () => {
     const csv = buildTemplateCSV()
     const firstLine = csv.split('\n')[0]
-    expect(firstLine).toContain('Full Name')
+    expect(firstLine).toContain('First Name')
+    expect(firstLine).toContain('Last Name')
     expect(firstLine).toContain('Gift Amount')
     expect(firstLine).toContain('Followed Up?')
   })
@@ -205,15 +278,22 @@ describe('buildTemplateCSV', () => {
     expect(csv).not.toContain('Call Made?')
   })
 
+  it('does not include the legacy Full Name column', () => {
+    const csv = buildTemplateCSV()
+    const firstLine = csv.split('\n')[0]
+    expect(firstLine).not.toContain('Full Name')
+  })
+
   it('includes exactly one data row (the example)', () => {
     const csv = buildTemplateCSV()
     const lines = csv.split('\n').filter(Boolean)
-    expect(lines).toHaveLength(2) // header + 1 example row
+    expect(lines).toHaveLength(2)
   })
 
-  it('example row has John Smith as the full name', () => {
+  it('example row has John / Smith as first/last name', () => {
     const csv = buildTemplateCSV()
-    expect(csv).toContain('John Smith')
+    expect(csv).toContain('John')
+    expect(csv).toContain('Smith')
   })
 
   it('round-trips: the example row can be parsed back by parseCSV', () => {
@@ -221,7 +301,8 @@ describe('buildTemplateCSV', () => {
     const { contacts, diagnostics } = parseCSV(csv)
     expect(diagnostics.skipped).toBe(0)
     expect(contacts).toHaveLength(1)
-    expect(contacts[0].fullName).toBe('John Smith')
+    expect(contacts[0].firstName).toBe('John')
+    expect(contacts[0].lastName).toBe('Smith')
     expect(contacts[0].topPriority).toBe(1)
   })
 })
@@ -229,12 +310,13 @@ describe('buildTemplateCSV', () => {
 describe('buildExportCSV', () => {
   const base: Contact = {
     id: 'test-id',
-    fullName: 'Jane Doe',
+    firstName: 'Jane',
+    lastName: 'Doe',
+    organization: undefined,
     relationship: 'Friend',
     returning: false,
     topPriority: null,
     addressStatus: 'Confirmed',
-    letterAddressName: 'Jane Doe',
     salutation: 'Jane',
     notes: '',
     streetAddress: '1 Oak Ave',
@@ -259,8 +341,8 @@ describe('buildExportCSV', () => {
 
   it('serializes boolean fields as Yes/No', () => {
     const csv = buildExportCSV([base])
-    expect(csv).toContain('Yes') // sent, followedUp, financialPartner
-    expect(csv).toContain('No')  // others
+    expect(csv).toContain('Yes')
+    expect(csv).toContain('No')
   })
 
   it('serializes sent=true as Yes', () => {
@@ -281,46 +363,43 @@ describe('buildExportCSV', () => {
     expect(contacts[0].giftAmount).toBe(250)
   })
 
-  it('round-trips all scalar string fields', () => {
+  it('round-trips firstName, lastName, and city', () => {
     const csv = buildExportCSV([base])
     const { contacts } = parseCSV(csv)
-    expect(contacts[0].fullName).toBe('Jane Doe')
+    expect(contacts[0].firstName).toBe('Jane')
+    expect(contacts[0].lastName).toBe('Doe')
     expect(contacts[0].city).toBe('Portland')
     expect(contacts[0].email).toBe('jane@example.com')
   })
 
   it('handles multiple contacts', () => {
-    const second: Contact = { ...base, fullName: 'Bob Smith', giftAmount: 0, sent: false }
+    const second: Contact = { ...base, firstName: 'Bob', lastName: 'Smith', giftAmount: 0, sent: false }
     const csv = buildExportCSV([base, second])
     const { contacts } = parseCSV(csv)
     expect(contacts).toHaveLength(2)
-    expect(contacts[1].fullName).toBe('Bob Smith')
+    expect(contacts[1].firstName).toBe('Bob')
+    expect(contacts[1].lastName).toBe('Smith')
     expect(contacts[1].sent).toBe(false)
   })
 
   it('produces a header row that parseCSV recognizes with no missing headers', () => {
     const csv = buildExportCSV([base])
     const { diagnostics } = parseCSV(csv)
-    // Call Made? is intentionally absent (it's an alias); everything else should be present
-    const missing = diagnostics.missingHeaders.filter(h => h !== 'Call Made?')
+    const missing = diagnostics.missingHeaders.filter(h => h !== 'Call Made?' && h !== 'Full Name')
     expect(missing).toHaveLength(0)
   })
 })
 
 describe('normalizeDateString', () => {
   it.each([
-    // Already correct — pass through
     ['2026-03-12', '2026-03-12'],
     ['2026-04-01', '2026-04-01'],
-    // M/D/YY — the format found in production data
     ['3/12/26',   '2026-03-12'],
     ['3/14/26',   '2026-03-14'],
     ['4/1/26',    '2026-04-01'],
     ['4/10/26',   '2026-04-10'],
-    // M/D/YYYY — four-digit year variant
     ['3/12/2026', '2026-03-12'],
     ['4/1/2026',  '2026-04-01'],
-    // Empty / junk — return empty string
     ['',    ''],
     ['-',   ''],
     ['N/A', ''],

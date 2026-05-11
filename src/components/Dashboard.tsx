@@ -75,7 +75,9 @@ function ContactRow({ contact, onEdit, showPledged }: ContactRowProps) {
       onClick={() => onEdit(contact)}
     >
       <div>
-        <p className="text-sm font-medium text-stone-dark">{contact.fullName}</p>
+        <p className="text-sm font-medium text-stone-dark">
+          {contact.organization || `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim()}
+        </p>
         <p className="text-xs text-stone-warm">{contact.relationship}</p>
       </div>
       <div className="flex items-center gap-1.5">
@@ -95,7 +97,6 @@ interface DashboardProps {
   activeTrip: Trip
   totalGoal: number
   additionalItems: AdditionalRaisingItem[]
-  additionalTotal: number
   onUpdateTrip: (updates: Partial<Omit<Trip, 'id' | 'userId' | 'isActive' | 'createdAt'>>) => Promise<void>
   onAddAdditionalItem: (label: string, amount: number) => Promise<void>
   onUpdateAdditionalItem: (id: string, label: string, amount: number) => Promise<void>

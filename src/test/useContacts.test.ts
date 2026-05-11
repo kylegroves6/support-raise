@@ -50,12 +50,13 @@ const TRIP_ID = 'trip-xyz-456'
 function makeContact(overrides: Partial<Contact> = {}): Contact {
   return {
     id: 'contact-1',
-    fullName: 'Alice Example',
+    firstName: 'Alice',
+    lastName: 'Example',
+    organization: undefined,
     relationship: 'Friend',
     returning: false,
     topPriority: null,
     addressStatus: '',
-    letterAddressName: '',
     salutation: '',
     notes: '',
     streetAddress: '',
@@ -81,15 +82,16 @@ function makeContact(overrides: Partial<Contact> = {}): Contact {
   }
 }
 
-function contactDbRow(id = 'contact-1', fullName = 'Alice Example') {
+function contactDbRow(id = 'contact-1', firstName = 'Alice', lastName = 'Example') {
   return {
     id,
     user_id: FAKE_USER_ID,
-    full_name: fullName,
+    first_name: firstName,
+    last_name: lastName,
+    organization: null,
     relationship: 'Friend',
     top_priority: null,
     address_status: '',
-    letter_address_name: '',
     salutation: '',
     notes: '',
     street_address: '',
@@ -149,7 +151,8 @@ describe('initial load', () => {
     const builder = (mockFrom as MockedFunction<typeof mockFrom>).mock.results[0].value
     expect(builder.eq).toHaveBeenCalledWith('user_id', FAKE_USER_ID)
     expect(result.current.contacts).toHaveLength(1)
-    expect(result.current.contacts[0].fullName).toBe('Alice Example')
+    expect(result.current.contacts[0].firstName).toBe('Alice')
+    expect(result.current.contacts[0].lastName).toBe('Example')
     expect(result.current.loading).toBe(false)
   })
 })
@@ -170,7 +173,7 @@ describe('addContact', () => {
     await act(async () => { await new Promise(r => setTimeout(r, 0)) })
 
     await act(async () => {
-      await result.current.addContact({ fullName: 'Alice Example', relationship: 'Friend' })
+      await result.current.addContact({ firstName: 'Alice', lastName: 'Example', relationship: 'Friend' })
     })
 
     // Call index 1 is the contacts insert
@@ -178,10 +181,12 @@ describe('addContact', () => {
     const insertArg = contactsBuilder.insert.mock.calls[0][0] as Record<string, unknown>
     expect(insertArg).not.toHaveProperty('id')
     expect(insertArg).toHaveProperty('user_id', FAKE_USER_ID)
-    expect(insertArg).toHaveProperty('full_name', 'Alice Example')
+    expect(insertArg).toHaveProperty('first_name', 'Alice')
+    expect(insertArg).toHaveProperty('last_name', 'Example')
 
     expect(result.current.contacts).toHaveLength(1)
-    expect(result.current.contacts[0].fullName).toBe('Alice Example')
+    expect(result.current.contacts[0].firstName).toBe('Alice')
+    expect(result.current.contacts[0].lastName).toBe('Example')
   })
 
   it('throws and does not update state when contacts insert fails', async () => {
@@ -193,7 +198,7 @@ describe('addContact', () => {
     await act(async () => { await new Promise(r => setTimeout(r, 0)) })
 
     await act(async () => {
-      await expect(result.current.addContact({ fullName: 'Bob' })).rejects.toMatchObject({ message: 'insert failed' })
+      await expect(result.current.addContact({ firstName: 'Bob' })).rejects.toMatchObject({ message: 'insert failed' })
     })
 
     expect(result.current.contacts).toHaveLength(0)
@@ -202,7 +207,7 @@ describe('addContact', () => {
 
 describe('updateContact', () => {
   it('patches only provided fields in contacts and contact_trips', async () => {
-    const updatedContact = { ...contactDbRow(), full_name: 'Alice Updated' }
+    const updatedContact = { ...contactDbRow(), first_name: 'Alice', last_name: 'Updated' }
     const ct = ctDbRow('contact-1', { gift_amount: 100 })
 
     // (0) initial load, (1) contacts update, (2) contact_trips upsert, (3) activity_log insert
@@ -216,11 +221,11 @@ describe('updateContact', () => {
     await act(async () => { await new Promise(r => setTimeout(r, 0)) })
 
     await act(async () => {
-      await result.current.updateContact('contact-1', { fullName: 'Alice Updated', giftAmount: 100 })
+      await result.current.updateContact('contact-1', { firstName: 'Alice', lastName: 'Updated', giftAmount: 100 })
     })
 
     const contactsBuilder = (mockFrom as MockedFunction<typeof mockFrom>).mock.results[1].value
-    expect(contactsBuilder.update.mock.calls[0][0]).toMatchObject({ full_name: 'Alice Updated' })
+    expect(contactsBuilder.update.mock.calls[0][0]).toMatchObject({ first_name: 'Alice', last_name: 'Updated' })
 
     const ctBuilder = (mockFrom as MockedFunction<typeof mockFrom>).mock.results[2].value
     expect(ctBuilder.upsert.mock.calls[0][0]).toMatchObject({ gift_amount: 100 })
@@ -248,8 +253,8 @@ describe('deleteContact', () => {
 
 describe('replaceAll (B1 fix)', () => {
   it('inserts new contacts BEFORE deleting old ones', async () => {
-    const newContact = makeContact({ id: 'contact-new', fullName: 'New Person' })
-    const newDbRow = { ...contactDbRow('contact-new', 'New Person'), contact_trips: [] }
+    const newContact = makeContact({ id: 'contact-new', firstName: 'New', lastName: 'Person' })
+    const newDbRow = { ...contactDbRow('contact-new', 'New', 'Person'), contact_trips: [] }
     const newCt = ctDbRow('contact-new')
 
     const callOrder: string[] = []
@@ -289,7 +294,7 @@ describe('replaceAll (B1 fix)', () => {
   })
 
   it('does not delete existing contacts when insert fails', async () => {
-    const newContact = makeContact({ fullName: 'New Person' })
+    const newContact = makeContact({ firstName: 'New', lastName: 'Person' })
     const deleteCalls: string[] = []
 
     mockFrom.mockReturnValueOnce(emptyLoadBuilder())

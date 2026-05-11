@@ -56,7 +56,7 @@ function TripDetail({ trip, onBack }: TripDetailProps) {
   const sorted = useMemo(() => {
     return [...contacts].sort((a, b) => {
       let cmp = 0
-      if (sortKey === 'name') cmp = a.fullName.localeCompare(b.fullName)
+      if (sortKey === 'name') cmp = `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
       else if (sortKey === 'relationship') cmp = (a.relationship ?? '').localeCompare(b.relationship ?? '')
       else if (sortKey === 'gift') cmp = (a.giftAmount ?? 0) - (b.giftAmount ?? 0)
       return sortDir === 'asc' ? cmp : -cmp
@@ -131,7 +131,9 @@ function TripDetail({ trip, onBack }: TripDetailProps) {
                 <tbody className="divide-y divide-cream-100">
                   {sorted.map(c => (
                     <tr key={c.id} className="hover:bg-cream-50 transition-colors">
-                      <td className="px-2 py-2 font-medium text-stone-dark">{c.fullName}</td>
+                      <td className="px-2 py-2 font-medium text-stone-dark">
+                        {c.organization || `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim()}
+                      </td>
                       <td className="px-2 py-2 text-stone-warm text-xs">{c.relationship}</td>
                       <td className="px-2 py-2 text-right font-mono text-xs text-sage-600">
                         {c.giftAmount != null && c.giftAmount !== 0 ? fmt(c.giftAmount) : ''}

@@ -5,11 +5,12 @@ import type { Contact } from '../types'
 
 // Permanent contact columns (no per-trip fields)
 const CONTACT_CAMEL_TO_SNAKE: Record<string, string> = {
-  fullName: 'full_name',
+  firstName: 'first_name',
+  lastName: 'last_name',
+  organization: 'organization',
   relationship: 'relationship',
   topPriority: 'top_priority',
   addressStatus: 'address_status',
-  letterAddressName: 'letter_address_name',
   salutation: 'salutation',
   notes: 'notes',
   streetAddress: 'street_address',
@@ -47,12 +48,13 @@ const TRIP_DEFAULTS = {
 function fromContactRow(row: DbRow): Omit<Contact, keyof typeof TRIP_DEFAULTS | 'contactTripId'> {
   return {
     id: row['id'] as string,
-    fullName: (row['full_name'] as string) ?? '',
+    firstName: (row['first_name'] as string) ?? '',
+    lastName: (row['last_name'] as string) ?? '',
+    organization: (row['organization'] as string | null) ?? undefined,
     relationship: (row['relationship'] as string) ?? '',
     returning: false,
     topPriority: row['top_priority'] != null ? Number(row['top_priority']) : null,
     addressStatus: (row['address_status'] as string) ?? '',
-    letterAddressName: (row['letter_address_name'] as string) ?? '',
     salutation: (row['salutation'] as string) ?? '',
     notes: (row['notes'] as string) ?? '',
     streetAddress: (row['street_address'] as string) ?? '',
@@ -240,11 +242,14 @@ export function useContacts(tripId: string | null | undefined) {
   const importContacts = useCallback(async (incoming: Contact[]): Promise<void> => {
     if (!tripId) throw new Error('No active trip')
     const userId = await getCurrentUserId()
-    const { data: existing } = await supabase.from('contacts').select('full_name').eq('user_id', userId)
+    const { data: existing } = await supabase.from('contacts').select('first_name,last_name').eq('user_id', userId)
     const existingNames = new Set(
-      ((existing as DbRow[] | null) ?? []).map(r => String(r['full_name'] ?? '').toLowerCase())
+      ((existing as DbRow[] | null) ?? []).map(r =>
+        `${String(r['first_name'] ?? '')} ${String(r['last_name'] ?? '')}`.trim().toLowerCase()
+      )
     )
-    const newOnes = incoming.filter(c => !existingNames.has((c.fullName ?? '').toLowerCase()))
+    const fullName = (c: Contact) => `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim()
+    const newOnes = incoming.filter(c => !existingNames.has(fullName(c).toLowerCase()))
     if (newOnes.length === 0) return
 
     const { data: insertedContacts, error } = await supabase

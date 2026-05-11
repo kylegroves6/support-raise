@@ -206,6 +206,7 @@ function DropdownMenu({ label, items, disabled }: {
 
 interface Props {
   contacts: Contact[]
+  followUpNeeded: Set<string>
   onEdit: (contact: Contact) => void
   onAdd: () => void
   onImport: () => void
@@ -214,7 +215,7 @@ interface Props {
   onUpdateMany: (ids: string[], data: Partial<Contact>) => Promise<void>
 }
 
-export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDeleteAll, onDeleteMany, onUpdateMany }: Props) {
+export default function ContactsTable({ contacts, followUpNeeded, onEdit, onAdd, onImport, onDeleteAll, onDeleteMany, onUpdateMany }: Props) {
   const relationshipOptions = useMemo(() =>
     [...new Set(contacts.map(c => c.relationship).filter(Boolean))].sort() as string[]
   , [contacts])
@@ -227,7 +228,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
     followedUp: '',
     partner: '',
   })
-  const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'fullName', dir: 'asc' })
+  const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'firstName', dir: 'asc' })
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 25
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -250,12 +251,14 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
 
     if (search.trim()) {
       const q = search.toLowerCase()
-      rows = rows.filter(c =>
-        (c.fullName || '').toLowerCase().includes(q) ||
-        (c.relationship || '').toLowerCase().includes(q) ||
-        (c.email || '').toLowerCase().includes(q) ||
-        (c.notes || '').toLowerCase().includes(q)
-      )
+      rows = rows.filter(c => {
+        const fullName = `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim()
+        return fullName.toLowerCase().includes(q) ||
+          (c.organization || '').toLowerCase().includes(q) ||
+          (c.relationship || '').toLowerCase().includes(q) ||
+          (c.email || '').toLowerCase().includes(q) ||
+          (c.notes || '').toLowerCase().includes(q)
+      })
     }
 
     if (filters.relationship) rows = rows.filter(c => c.relationship === filters.relationship)
@@ -469,7 +472,7 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
                     onChange={toggleAll}
                   />
                 </th>
-                <Th label="Name" field="fullName" sort={sort} onSort={handleSort} />
+                <Th label="Name" field="firstName" sort={sort} onSort={handleSort} />
                 <Th label="Relationship" field="relationship" sort={sort} onSort={handleSort} />
                 <Th label="Priority" field="topPriority" sort={sort} onSort={handleSort} />
                 <Th label="Delivery Method" field="addressStatus" sort={sort} onSort={handleSort} />
@@ -500,7 +503,12 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
                       />
                     </td>
                     <td className="px-3 py-2.5 max-w-[180px]">
-                      <p className="font-medium text-stone-dark truncate" title={c.fullName}>{c.fullName}</p>
+                      {(() => {
+                        const displayName = c.organization
+                          ? c.organization
+                          : `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim()
+                        return <p className="font-medium text-stone-dark truncate" title={displayName}>{displayName}</p>
+                      })()}
                       {c.email && <p className="text-xs text-stone-warm truncate" title={c.email}>{c.email}</p>}
                     </td>
                     <td className="px-3 py-2.5 text-stone-warm text-xs whitespace-nowrap">{c.relationship}</td>
@@ -524,6 +532,11 @@ export default function ContactsTable({ contacts, onEdit, onAdd, onImport, onDel
                       <div className="flex flex-wrap gap-1">
                         {c.sent && <Chip label="Contacted" color="blue" />}
                         {c.followedUp && <Chip label="Followed Up" color="green" />}
+                        {followUpNeeded.has(c.id) && !c.followedUp && (
+                          <span title="Follow-up overdue (contacted 7+ days ago)">
+                            <Chip label="Follow-up Needed" color="red" />
+                          </span>
+                        )}
                         {c.financialPartner && <Chip label="Partner" color="green" />}
                         {c.prayerPartner && <Chip label="Prayer" color="cream" />}
                         {c.pledgedToGive && !c.financialPartner && <Chip label="Pledged" color="amber" />}

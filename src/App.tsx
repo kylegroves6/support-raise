@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useContacts } from './hooks/useContacts'
 import { useTrips } from './hooks/useTrips'
 import { useAdditionalRaising } from './hooks/useAdditionalRaising'
+import { useActivityLog } from './hooks/useActivityLog'
 import { useSession } from './lib/AuthContext'
 import { supabase } from './lib/supabase'
 import Dashboard from './components/Dashboard'
@@ -30,6 +31,7 @@ function AuthenticatedApp() {
   const { activeTrip, createTrip, updateActiveTrip } = useTrips()
   const { contacts, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll, deleteMany, updateMany, ensureAllContactTrips } = useContacts(activeTrip?.id)
   const { items: additionalItems, additionalTotal, addItem, updateItem, deleteItem } = useAdditionalRaising()
+  const { followUpNeeded } = useActivityLog()
   const totalGoal = (activeTrip?.tripCost ?? 0) + additionalTotal
 
   const [tab, setTab] = useState<Tab>('Dashboard')
@@ -187,7 +189,6 @@ function AuthenticatedApp() {
             activeTrip={activeTrip}
             totalGoal={totalGoal}
             additionalItems={additionalItems}
-            additionalTotal={additionalTotal}
             onUpdateTrip={updateActiveTrip}
             onAddAdditionalItem={addItem}
             onUpdateAdditionalItem={updateItem}
@@ -198,6 +199,7 @@ function AuthenticatedApp() {
         {tab === 'Contacts' && (
           <ContactsTable
             contacts={contacts}
+            followUpNeeded={followUpNeeded}
             onEdit={contact => setEditingContact(contact)}
             onAdd={() => setAddingContact(true)}
             onImport={() => setShowImport(true)}
