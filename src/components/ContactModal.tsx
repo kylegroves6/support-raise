@@ -347,9 +347,16 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
     <div className="fixed inset-0 bg-stone-dark/40 flex items-start justify-center z-50 p-4 overflow-y-auto">
       <div role="dialog" aria-modal="true" className="bg-white rounded-2xl shadow-modal w-full max-w-2xl my-8">
         <div className="flex items-center justify-between px-6 py-4 border-b border-cream-200">
-          <h2 className="text-lg font-semibold text-stone-dark">
-            {isNew ? 'Add Contact' : [form.firstName, form.lastName].filter(Boolean).join(' ') || form.organization || 'Edit Contact'}
-          </h2>
+          <div>
+            <h2 className="text-lg font-semibold text-stone-dark">
+              {isNew ? 'Add Contact' : [form.firstName, form.lastName].filter(Boolean).join(' ') || form.organization || 'Edit Contact'}
+            </h2>
+            {!isNew && contact.createdAt && (
+              <p className="text-xs text-stone-warm mt-0.5">
+                Added {new Date(contact.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </p>
+            )}
+          </div>
           <button onClick={onClose} className="btn-ghost text-stone-warm text-xl leading-none">×</button>
         </div>
 

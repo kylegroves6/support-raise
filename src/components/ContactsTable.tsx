@@ -507,7 +507,19 @@ export default function ContactsTable({ contacts, followUpNeeded, onEdit, onAdd,
                         const displayName = c.organization
                           ? c.organization
                           : `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim()
-                        return <p className="font-medium text-stone-dark truncate" title={displayName}>{displayName}</p>
+                        const incomplete = !c.phone && !c.email && !c.streetAddress
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            {incomplete && (
+                              <span
+                                data-testid="incomplete-indicator"
+                                title="Missing contact info — no phone, email, or address"
+                                className="w-2 h-2 rounded-full bg-amber-400 shrink-0"
+                              />
+                            )}
+                            <p className="font-medium text-stone-dark truncate" title={displayName}>{displayName}</p>
+                          </div>
+                        )
                       })()}
                       {c.email && <p className="text-xs text-stone-warm truncate" title={c.email}>{c.email}</p>}
                     </td>

@@ -96,7 +96,7 @@ supabase stop
 
 ## Testing
 
-**Unit tests (162):**
+**Unit tests (174):**
 ```bash
 npm test -- --run
 ```
@@ -155,6 +155,7 @@ supabase db push
 │   │   ├── GoalSettings.tsx      # Trip cost / goal editor
 │   │   ├── TripHistory.tsx       # Past trips list
 │   │   ├── TripRollover.tsx      # Create new trip UI
+│   │   ├── NameStorm.tsx         # Rapid name-entry brainstorm session
 │   │   ├── RelationshipSelect.tsx # Constrained relationship combobox
 │   │   └── LoginPage.tsx         # Supabase Auth sign-in / sign-up
 │   ├── hooks/

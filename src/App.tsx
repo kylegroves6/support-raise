@@ -13,9 +13,10 @@ import LoginPage from './components/LoginPage'
 import MissionSetup from './components/MissionSetup'
 import TripRollover from './components/TripRollover'
 import TripHistory from './components/TripHistory'
+import NameStorm from './components/NameStorm'
 import type { Contact, Trip, ImportMode } from './types'
 
-const TABS = ['Dashboard', 'Contacts'] as const
+const TABS = ['Dashboard', 'Contacts', 'Name Storm'] as const
 type Tab = typeof TABS[number]
 
 export default function App() {
@@ -209,6 +210,14 @@ function AuthenticatedApp() {
             }}
             onDeleteMany={deleteMany}
             onUpdateMany={updateMany}
+          />
+        )}
+        {tab === 'Name Storm' && (
+          <NameStorm
+            activeTrip={activeTrip}
+            contacts={contacts}
+            addContact={addContact}
+            onCreateTrip={() => setShowRollover(true)}
           />
         )}
 
