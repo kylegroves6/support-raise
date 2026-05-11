@@ -28,22 +28,17 @@ Clean, well-reasoned codebase. Safe for personal use today. Needs targeted fixes
 
 ## Phase B — Dangerous Bugs (before sharing with others)
 
-### B1. `replaceAll` is not atomic — DATA LOSS RISK
-**File:** `src/hooks/useContacts.ts:249-274`
-**Problem:** Deletes all contacts first, then inserts. If insert fails mid-way (network error), user loses all data with no recovery.
-**Fix:** Wrap in a Supabase RPC function that does both operations in a single transaction, OR add optimistic backup: store the deleted rows in memory and re-insert them if the subsequent insert throws.
+### B1. `replaceAll` is not atomic — ✅ Fixed
+Insert-first pattern implemented: new contacts and contact_trips are inserted before any deletion. If insert fails, existing data is untouched. If contact_trips insert fails, the new contacts are rolled back. Old contacts are deleted only after all new data is safely written (`useContacts.ts:281-309`).
 
-### B2. Hardcoded personal email in seed migration
-**File:** `supabase/migrations/20260506005000_seed_daytona_2025_trip.sql:14`
-**Problem:** `WHERE email = 'kylegroves6@gmail.com'` — this migration fails loudly (or silently no-ops) for every other user.
-**Fix:** Move this seed data out of migrations entirely. Either:
-- Delete the migration file and re-apply the data manually via `supabase db query --linked`
-- Or wrap the migration in a conditional that checks an env var so it only runs locally
+### B2. Hardcoded personal email in seed migration — ✅ Fixed
+`supabase/migrations/20260506005000_seed_daytona_2025_trip.sql` no longer exists. Personal seed data removed from migrations entirely.
 
-### B3. Client-side queries missing explicit `user_id` filter
-**Files:** `src/hooks/useContacts.ts:121-125`, `src/hooks/useTrips.ts:39-46`, `src/hooks/useAdditionalRaising.ts:14-22`
-**Problem:** Initial data loads rely entirely on RLS with no client-side `user_id` filter. A RLS misconfiguration would silently expose all users' data.
-**Fix:** Add `.eq('user_id', userId)` to each initial SELECT. Requires fetching userId first (already done in other callbacks — extract to a shared util).
+### B3. Client-side queries missing explicit `user_id` filter — ✅ Fixed
+All three hooks filter by `user_id` on initial SELECT:
+- `useContacts.ts:122` — `.eq('user_id', userId)`
+- `useTrips.ts:38` — `.eq('user_id', userId)`
+- `useAdditionalRaising.ts:20` — `.eq('user_id', userId)`
 
 ---
 
@@ -60,16 +55,13 @@ Clean, well-reasoned codebase. Safe for personal use today. Needs targeted fixes
 - Playwright `globalSetup` runs `supabase db reset --local` before each E2E suite — no manual cleanup needed
 - **Next step:** Enable GitHub branch protection on `main` — require `test` job to pass before any push or merge lands. See ROADMAP Phase 1.5 for details.
 
-### C3. Remove orphaned `NoResponsePage.tsx`
-**File:** `src/components/NoResponsePage.tsx`
-**Problem:** Defined but never rendered anywhere in the app. Dead code.
-**Fix:** Either wire it into the tab navigation in `App.tsx`, or delete it.
+### C3. Remove orphaned `NoResponsePage.tsx` — ✅ Fixed
+File deleted. No longer present in `src/components/`.
 
 ### C4. Remove dead Vite proxy config — ✅ Done (removed in earlier session).
 
-### C5. Deduplicate `getCurrentUserId()`
-**Files:** `src/hooks/useContacts.ts:102-106`, `src/hooks/useTrips.ts:29-33`
-**Fix:** Extract to `src/lib/auth.ts` and import in both hooks.
+### C5. Deduplicate `getCurrentUserId()` — ✅ Fixed
+Extracted to `src/lib/auth.ts`. All three hooks (`useContacts`, `useTrips`, `useAdditionalRaising`) import from there.
 
 ### C6. Remove `uuid` package dependency — ✅ Done (removed in earlier session).
 
@@ -107,14 +99,11 @@ Clean, well-reasoned codebase. Safe for personal use today. Needs targeted fixes
 **Problem:** GDPR/CCPA require users to be able to export and delete their data.
 **Fix:** Add "Export my data" (already have CSV export — just needs a clear path) and "Delete account" (cascades via `ON DELETE CASCADE` already set up in DB).
 
-### E2. No audit log
-**Problem:** No record of who changed what and when. Donor data changes are untrackable.
-**Fix:** Implement the `activity_log` table described in ROADMAP Phase 1.6.
+### E2. No audit log — ✅ Done
+`activity_log` table is live in production. `useActivityLog` hook drives the "Follow-up Needed" chip in ContactsTable. Old/new value diff (change data capture) deferred to Phase 2/3.
 
-### E3. Seed migration has personal data
-**File:** `supabase/migrations/20260506005000_seed_daytona_2025_trip.sql`
-**Problem:** Contains personal trip data (Daytona Beach, dates, cost) for a specific user.
-**Fix:** Same as B2 — remove from migrations, apply manually.
+### E3. Seed migration has personal data — ✅ Fixed
+Same as B2 — file removed.
 
 ---
 
