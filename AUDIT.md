@@ -1,59 +1,28 @@
 # Support Raising Tracker — Audit & Remediation Plan
-**Audited:** 2026-05-10
+**Originally audited:** 2026-05-10  
+**Last updated:** 2026-05-10 (post Phase 2 security hardening)
 
 ---
 
 ## Overall Verdict
-Clean, well-reasoned codebase. Safe for personal use today. Needs targeted fixes before multi-tenant SaaS launch. ~60% production-ready.
+Clean, well-reasoned codebase. Safe for personal use today. Needs targeted fixes before multi-tenant SaaS launch.
+
+## Phase 2 Security Hardening — Complete ✓
+*(Completed 2026-05-10 — items below are closed)*
+
+- **npm audit** — 0 high/critical CVEs. No action needed.
+- **RLS audit** — All 6 public tables audited via `pg_policies`. Every policy uses `(SELECT auth.uid() AS uid) = user_id` on ALL operations with both `qual` and `with_check` set. This is the efficient subquery form (evaluated once per query, not per row). No cross-user reads possible.
+- **CSP header** — `Content-Security-Policy` added to `vercel.json`: restricts `script-src` to self + `unsafe-inline` (required for Vite/React), `connect-src` to self + Supabase project URL + Sentry, `frame-ancestors 'none'`.
+- **eslint-plugin-security** — Installed and wired into `eslint.config.js` for all JS/TS files. Lint runs clean: 0 errors. 25 warnings remain — all are `security/detect-object-injection` false positives on typed `Record<string, T>` bracket access (e.g. `c[key]` where `key: keyof Contact`, `row[csvCol]` where `csvCol` comes from a known `COLUMN_MAP`). The plugin cannot resolve TypeScript's type constraints statically, so it flags all bracket notation on objects whose key came from a variable. No actual injection risk — all keys are program-controlled strings, not user input.
+- **Pre-existing lint errors fixed** as a side effect of adding the plugin: `React.` type references without import, unused variable in `RelationshipSelect`, useless escape in `validatePhone`, inline component in `TripHistory`, and the eslint config not covering `e2e/`/`vite.config.ts`/`playwright.config.ts` files.
 
 ---
 
-## Phase A — Ship It (do first, ~30 min)
-*Gets the app deployed to Vercel and usable as a phone home-screen app.*
+## Phase A — Ship It ✓ (Complete — deployed to Vercel)
 
-### A1. Add `vercel.json` — UNBLOCKS DEPLOYMENT
-Without this, any page refresh on Vercel returns a 404 (Vite SPA routing breaks).
-
-**Fix:** Create `/vercel.json` at project root:
-```json
-{
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
-}
-```
-
-### A2. Add PWA support (vite-pwa plugin)
-Lets users "Add to Home Screen" on iOS/Android for a native-app-like experience (full screen, app icon, no browser chrome).
-
-**Fix:**
-1. `npm install -D vite-plugin-pwa`
-2. Add to `vite.config.ts`:
-```ts
-import { VitePWA } from 'vite-plugin-pwa'
-// inside defineConfig plugins array:
-VitePWA({
-  registerType: 'autoUpdate',
-  manifest: {
-    name: 'Support Tracker',
-    short_name: 'Support',
-    description: 'Mission fundraising support tracker',
-    theme_color: '#6b7c5e',
-    background_color: '#f5f0e8',
-    display: 'standalone',
-    icons: [
-      { src: '/icons.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
-    ],
-  },
-})
-```
-3. Verify `public/icons.svg` exists (it does).
-
-### A3. Supabase redirect URL config (dashboard only, no code change)
-After deploying to Vercel, add your production URL to Supabase:
-- Dashboard → Authentication → URL Configuration → Redirect URLs
-- Add: `https://your-app.vercel.app`
-- Also add the Vercel preview URL pattern if desired: `https://*-your-project.vercel.app`
-
-Also verify **Authentication → Providers → Email → Confirm email** is ON for the production project.
+### A1. `vercel.json` — ✅ Done. SPA rewrite rule + CSP header now live.
+### A2. PWA support — ✅ Done. `vite-plugin-pwa` installed.
+### A3. Supabase redirect URL config — ✅ Done (applied to production project).
 
 ---
 
@@ -80,41 +49,25 @@ Also verify **Authentication → Providers → Email → Confirm email** is ON f
 
 ## Phase C — Code Quality (before opening to more users)
 
-### C1. ESLint doesn't cover TypeScript
-**File:** `eslint.config.js`
-**Problem:** Config only covers `**/*.{js,jsx}`. All source files are `.ts`/`.tsx`. No TS rules, no React hooks lint is running.
-**Fix:** Add `@typescript-eslint` parser and extend config to cover `**/*.{ts,tsx}`.
-```bash
-npm install -D @typescript-eslint/parser @typescript-eslint/eslint-plugin
-```
-Then update `eslint.config.js` to add a TS config block alongside the existing JS block.
+### C1. ESLint TypeScript coverage — ✅ Done.
+`@typescript-eslint` wired in for all `.ts`/`.tsx` files. `eslint-plugin-security` also added. 0 errors.
 
-### C2. No tests
-**Problem:** Zero test files. No safety net for regressions.
-**Recommended stack (already in ROADMAP):** Vitest + React Testing Library + Playwright
-**Priority test targets:**
-- `src/utils/csvParser.ts` — pure functions, easy to unit test
-- `src/hooks/useContacts.ts` — critical data mutations
-- E2E: sign in → add contact → import CSV → view dashboard
+### C2. Tests — ✅ Done.
+- 159 Vitest unit tests passing across 4 files (csvParser, useContacts, contactValidation, property/fuzz)
+- 10 Playwright E2E tests passing against local Supabase
 
 ### C3. Remove orphaned `NoResponsePage.tsx`
 **File:** `src/components/NoResponsePage.tsx`
 **Problem:** Defined but never rendered anywhere in the app. Dead code.
 **Fix:** Either wire it into the tab navigation in `App.tsx`, or delete it.
 
-### C4. Remove dead Vite proxy config
-**File:** `vite.config.ts:13-18`
-**Problem:** Proxy to `localhost:3001` — no backend server exists.
-**Fix:** Delete the `server.proxy` block.
+### C4. Remove dead Vite proxy config — ✅ Done (removed in earlier session).
 
 ### C5. Deduplicate `getCurrentUserId()`
 **Files:** `src/hooks/useContacts.ts:102-106`, `src/hooks/useTrips.ts:29-33`
 **Fix:** Extract to `src/lib/auth.ts` and import in both hooks.
 
-### C6. Remove `uuid` package dependency
-**File:** `src/utils/csvParser.ts:2,183`
-**Problem:** `uuidv4()` generates IDs for parsed contacts but they're discarded on Supabase insert (server generates real UUIDs). Adds a dependency for no value.
-**Fix:** Remove `import { v4 as uuidv4 } from 'uuid'`. Change the contacts.push line to omit `id` (cast to `Contact` after insert, not before). Uninstall with `npm uninstall uuid`.
+### C6. Remove `uuid` package dependency — ✅ Done (removed in earlier session).
 
 ### C7. `returning` field reads stale DB column
 **File:** `src/hooks/useContacts.ts:51`
@@ -162,10 +115,11 @@ Then update `eslint.config.js` to add a TS config block alongside the existing J
 ---
 
 ## Non-Issues (confirmed safe)
-- `npm audit` — 0 vulnerabilities
+- `npm audit` — 0 vulnerabilities (confirmed Phase 2, 2026-05-10)
 - `tsc --noEmit` — 0 type errors
 - `.gitignore` — correctly excludes `.env`, `*.csv`, `dist/`
-- RLS `WITH CHECK` — correctly set on all tables
+- RLS `WITH CHECK` — correctly set on all 6 tables; uses efficient `(SELECT auth.uid())` subquery pattern
 - OAuth + email share same Supabase user correctly
 - No `dangerouslySetInnerHTML` — XSS risk is low
 - Supabase anon key correctly identified as non-secret
+- No service-role key in client bundle

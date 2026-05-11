@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import type { Trip } from '../types'
 
 interface Props {
@@ -31,7 +31,7 @@ export default function TripRollover({ currentMission, onRollover, onClose }: Pr
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
     setSaving(true)

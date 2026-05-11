@@ -1,17 +1,17 @@
 # Support Raising Tracker — Roadmap
 
-## Current State (v0.8 — May 2026)
+## Current State (v0.9 — May 2026)
 
 - Vite + React + TypeScript + Tailwind SPA
 - Supabase for database (Postgres), auth, and RLS
 - No server-side component — Supabase JS client called directly from React hooks
 - Supabase CLI linked for migrations
 - Deployed to Vercel; installable as PWA on iOS/Android home screen
-- 137 unit tests passing (csvParser, useContacts, contactValidation, csvParser.property)
-- Playwright E2E: 8 golden-path tests green against local Supabase
+- 159 unit tests passing (csvParser, useContacts, contactValidation, csvParser.property)
+- Playwright E2E: 10 golden-path tests green against local Supabase
 - Sentry initialized with Session Replay (`VITE_SENTRY_DSN` env var — add to Vercel)
 - `activity_log` table live in production, accumulating data
-- Pre-Phase 2 hardening complete: validation, constrained selects, fuzz testing
+- Phase 2 security hardening complete: npm audit clean, RLS audited, CSP header, eslint-plugin-security, phone normalization, E2E trip/goal tests
 
 ### Migration hygiene rule (absolute)
 Every schema change must:
@@ -91,24 +91,32 @@ Core CRUD, auth, RLS, trips, goals, CSV import/export, additional raising items.
 Priority order reflects what provides value now, before opening the app to other users.
 AI/letter drafting deferred to Phase 2.5 — not needed until active letter-writing season.
 
-### Security hardening (do first — required before other users)
-- Run `npm audit` and resolve any high/critical CVEs in the dependency tree
-- Add `eslint-plugin-security` or similar to catch obvious injection patterns at lint time
-- Review all Supabase RLS policies against the current schema — confirm no table is readable cross-user
+### Security hardening ✓
+- ✅ `npm audit` — 0 high/critical CVEs
+- ✅ `eslint-plugin-security` installed and wired into `eslint.config.js` — 0 errors; warnings are all false-positive object-injection on typed Record access
+- ✅ All 6 RLS policies audited: every table uses `(SELECT auth.uid()) = user_id` with `qual` + `with_check` — no cross-user reads possible
+- ✅ CSP header added to `vercel.json`: restricts `script-src`/`connect-src` to own domain + Supabase + Sentry
+- ✅ Pre-existing lint errors fixed: `React.` type references, unused variable, inline component in TripHistory, useless escape in validatePhone
 - Rate limiting: Supabase's built-in auth rate limits are on by default; confirm Edge Functions (when added) are protected
-- CSP headers: add `Content-Security-Policy` to Vercel config to restrict script/connect sources
-- No secrets in client bundle: audit that no service-role key or API key is reachable from the browser
+- No secrets in client bundle: Supabase URL + anon key are intentionally public; no service-role key present
 
-### Phone normalization on import
-- Add `normalizePhoneString` to `csvParser.ts`: strip formatting (parens, dots, spaces) → consistent hyphen-delimited form on import
-- Normalize on blur in ContactModal (not on keystroke — don't fight the user while typing)
-- Add unit tests and property-based fuzz tests
+### Phone normalization on import ✓
+- ✅ `normalizePhoneString` added to `csvParser.ts`: strips parens/dots/spaces/+1 country code → XXX-XXX-XXXX; international numbers pass through
+- ✅ Called on `phone` field during CSV import (same pattern as `normalizeDateString`)
+- ✅ `onBlur` handler in ContactModal normalizes on focus-leave (not on keystroke)
+- ✅ 13 unit tests added to `csvParser.test.ts`
+- ✅ 6 property-based fuzz tests added to `csvParser.property.test.ts`
+- 159 unit tests passing (was 137)
 
-### Trip creation / editing E2E tests
-- E2E test: create a new trip, verify dashboard updates with correct trip name and dates
-- E2E test: days-until-departure math — verify displayed count is correct for a known future date
-- E2E test: set trip cost + additional raising items, verify total goal math on dashboard
-- These guard against regressions when trip/goal logic changes
+### Trip creation / goal math E2E tests ✓
+- ✅ E2E test 7: create new trip via TripRollover UI with 30-day-future start; verify trip name in header and positive days-until count on dashboard
+- ✅ E2E test 8: set trip cost ($3,000) + additional raising item ($200) via GoalSettings; verify total goal $3,200 on dashboard
+- ✅ Both tests include REST API cleanup (idempotent across runs)
+- ✅ `cleanupTestTrips` added to `beforeAll` so test state resets at suite start
+
+### Phone normalization — international number UX (backlog)
+- Consider a separate international phone field or country prefix selector to avoid digit-count ambiguity with US pattern matching
+- The `onBlur` path in ContactModal is tested via unit tests but not yet via Playwright interaction
 
 ### Quick-add contact form
 - Minimal inline form in ContactsTable (name + relationship only) for fast list-building

@@ -13,29 +13,62 @@ async function signIn(page: Page) {
   await page.getByRole('button', { name: 'Sign in' }).click()
 }
 
-// Deletes contacts created by these tests via Supabase REST API so runs are idempotent.
-async function cleanupTestContacts(request: import('@playwright/test').APIRequestContext) {
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321'
-  const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY ?? ''
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321'
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY ?? ''
 
-  // Sign in to get a JWT for RLS-authorized deletes
-  const authRes = await request.post(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-    headers: { apikey: supabaseKey, 'Content-Type': 'application/json' },
+// Returns a JWT for the test user (used by cleanup helpers).
+async function getTestToken(request: import('@playwright/test').APIRequestContext): Promise<string> {
+  const authRes = await request.post(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
     data: { email: TEST_EMAIL, password: TEST_PASSWORD },
   })
   const { access_token } = await authRes.json() as { access_token: string }
+  return access_token
+}
 
-  // Delete contacts with test first names
-  for (const firstName of ['PlaywrightTest', 'CSV', 'ValidationTest', 'ValidationTest2', 'AutoContactedTest']) {
-    await request.delete(`${supabaseUrl}/rest/v1/contacts?first_name=eq.${firstName}`, {
-      headers: { apikey: supabaseKey, Authorization: `Bearer ${access_token}` },
+// Deletes contacts created by these tests via Supabase REST API so runs are idempotent.
+async function cleanupTestContacts(request: import('@playwright/test').APIRequestContext) {
+  const token = await getTestToken(request)
+  for (const firstName of ['PlaywrightTest', 'CSV', 'ValidationTest', 'ValidationTest2', 'AutoContactedTest', 'PhoneTest']) {
+    await request.delete(`${SUPABASE_URL}/rest/v1/contacts?first_name=eq.${firstName}`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
     })
   }
+}
+
+// Deletes trips created by E2E tests (by mission_name prefix) and restores the
+// seeded trip as active so subsequent tests start from a known state.
+async function cleanupTestTrips(request: import('@playwright/test').APIRequestContext) {
+  const token = await getTestToken(request)
+  const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  // Delete any trips created by E2E tests (match by name prefix)
+  await request.delete(`${SUPABASE_URL}/rest/v1/trips?mission_name=like.E2ETest*`, { headers })
+  // Re-activate the original seeded trip (most recent remaining trip)
+  const tripsRes = await request.get(`${SUPABASE_URL}/rest/v1/trips?select=id&order=created_at.asc&limit=1`, { headers })
+  const trips = await tripsRes.json() as { id: string }[]
+  if (trips.length > 0) {
+    await request.patch(`${SUPABASE_URL}/rest/v1/trips?id=eq.${trips[0].id}`, {
+      headers,
+      data: { is_active: true },
+    })
+  }
+}
+
+async function cleanupGoalState(request: import('@playwright/test').APIRequestContext) {
+  const token = await getTestToken(request)
+  const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  await request.delete(`${SUPABASE_URL}/rest/v1/additional_raising?label=eq.E2E Postage`, { headers })
+  await request.patch(`${SUPABASE_URL}/rest/v1/trips?is_active=eq.true`, {
+    headers,
+    data: { trip_cost: 0 },
+  })
 }
 
 // Clean test data before the suite so each run starts with a predictable state.
 test.beforeAll(async ({ request }) => {
   await cleanupTestContacts(request)
+  await cleanupTestTrips(request)
+  await cleanupGoalState(request)
 })
 
 // ── 1. Sign in ─────────────────────────────────────────────────────────────
@@ -265,4 +298,133 @@ test('export CSV and verify it contains expected columns', async ({ page }) => {
   expect(content).toMatch(/First Name/)
   expect(content).toMatch(/Relationship/)
   expect(content.split('\n').length).toBeGreaterThan(1)
+})
+
+// ── 7. Create new trip — verify dashboard trip name + positive days-until ─────
+
+test('create new trip and verify dashboard shows trip name and positive days-until', async ({ page, request }) => {
+  // Compute a start date 30 days from today in YYYY-MM-DD
+  const missionStart = new Date()
+  missionStart.setDate(missionStart.getDate() + 30)
+  const startISO = missionStart.toISOString().slice(0, 10)
+  const tripName = 'E2ETest New Trip'
+
+  await signIn(page)
+  await expect(page.getByRole('heading', { name: 'Sign in' })).not.toBeVisible({ timeout: 10000 })
+
+  // Open the trip menu in the header and click "New trip"
+  await page.locator('header').getByRole('button').first().click()
+  await page.getByRole('button', { name: 'New trip' }).click()
+
+  // TripRollover modal should appear
+  const modal = page.getByRole('dialog').filter({ hasText: 'Start a new trip' })
+    .or(page.locator('.fixed.inset-0').filter({ hasText: 'Start a new trip' }))
+  await expect(page.getByText('Start a new trip')).toBeVisible({ timeout: 5000 })
+
+  // Fill in the new trip form
+  await page.getByPlaceholder(/e.g. Tokyo Mission 2027/i).fill(tripName)
+  // Start date input (label: "Start date" in the rollover modal)
+  const startInputs = page.locator('input[type="date"]')
+  await startInputs.first().fill(startISO)
+
+  await page.getByRole('button', { name: /start new trip/i }).click()
+
+  // Wait for the modal to close and the dashboard to reflect the new trip
+  await expect(page.getByText('Start a new trip')).not.toBeVisible({ timeout: 10000 })
+
+  // Dashboard header should show the new trip name
+  await expect(page.getByText(tripName)).toBeVisible({ timeout: 8000 })
+
+  // Dashboard should show a positive "days until departure" count
+  await expect(page.getByText('days until departure')).toBeVisible({ timeout: 8000 })
+  const daysText = await page.locator('text=days until departure').locator('..').locator('p').first().textContent()
+  const days = parseInt(daysText ?? '0', 10)
+  expect(days).toBeGreaterThan(0)
+
+  // Cleanup: remove the test trip and restore original
+  await cleanupTestTrips(request)
+})
+
+// ── 8. Set trip cost + additional raising item — verify total goal math ────────
+
+test('trip cost + additional raising item sum equals total goal on dashboard', async ({ page, request }) => {
+  await signIn(page)
+  await expect(page.getByRole('heading', { name: 'Sign in' })).not.toBeVisible({ timeout: 10000 })
+
+  // Navigate to Dashboard
+  await page.getByRole('button', { name: 'Dashboard' }).click()
+
+  // Open GoalSettings via "Edit goals"
+  await expect(page.getByRole('button', { name: /edit goals/i })).toBeVisible({ timeout: 8000 })
+  await page.getByRole('button', { name: /edit goals/i }).click()
+
+  // GoalSettings modal should be visible
+  await expect(page.getByText('Total Goal')).toBeVisible({ timeout: 5000 })
+
+  // Set trip cost to 3000 — use the label to anchor to the right input
+  const tripCostLabel = page.getByText('Trip Cost', { exact: true })
+  const tripCostInput = tripCostLabel.locator('~ div input[type="number"]')
+  await tripCostInput.clear()
+  await tripCostInput.fill('3000')
+
+  // Save button is the sibling of the input's parent div
+  await tripCostLabel.locator('~ div button').click()
+
+  // Add an additional raising item: label "E2E Postage", amount 200
+  await page.getByPlaceholder(/label/i).fill('E2E Postage')
+  const amountInputs = page.locator('input[type="number"]')
+  await amountInputs.last().fill('200')
+  await page.getByRole('button', { name: /^add$/i }).click()
+
+  // Verify the computed total in GoalSettings shows 3,200
+  await expect(page.getByText('$3,200').first()).toBeVisible({ timeout: 5000 })
+
+  // Close the modal
+  await page.getByRole('button', { name: /close/i }).click()
+  await expect(page.getByText('Total Goal')).not.toBeVisible({ timeout: 5000 })
+
+  // Dashboard should now show "of $3,200" in the support goal card
+  await expect(page.getByText(/of \$3,200/)).toBeVisible({ timeout: 8000 })
+
+  // Cleanup: remove all E2E Postage rows (handles duplicates from prior failed runs)
+  // and reset trip cost to 0 on the active trip
+  const token = await getTestToken(request)
+  const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  await request.delete(`${SUPABASE_URL}/rest/v1/additional_raising?label=eq.E2E Postage`, { headers })
+  await request.patch(`${SUPABASE_URL}/rest/v1/trips?is_active=eq.true`, {
+    headers,
+    data: { trip_cost: 0 },
+  })
+})
+
+// ── 9. Phone field normalizes on blur in ContactModal ─────────────────────────
+
+test('phone field normalizes to XXX-XXX-XXXX format on blur', async ({ page }) => {
+  await signIn(page)
+  await expect(page.getByRole('heading', { name: 'Sign in' })).not.toBeVisible({ timeout: 10000 })
+  await page.getByRole('button', { name: 'Contacts' }).click()
+
+  const addBtn = page.getByRole('button', { name: /add contact/i })
+  await expect(addBtn).toBeVisible({ timeout: 8000 })
+  await addBtn.click()
+
+  const modal = page.getByRole('dialog')
+  await expect(modal).toBeVisible()
+
+  await modal.getByLabel(/first name/i).fill('PhoneTest')
+  await modal.getByLabel(/last name/i).fill('Person')
+
+  // Type a formatted US phone number into the phone field
+  const phoneInput = modal.locator('input[type="tel"]')
+  await phoneInput.fill('(555) 867-5309')
+
+  // Tab away to trigger onBlur normalization
+  await phoneInput.press('Tab')
+
+  // Field should now show normalized XXX-XXX-XXXX
+  await expect(phoneInput).toHaveValue('555-867-5309')
+
+  // Close without saving — no DB cleanup needed
+  await modal.getByRole('button', { name: /cancel/i }).click()
+  await expect(modal).not.toBeVisible({ timeout: 5000 })
 })

@@ -110,8 +110,8 @@ export function useContacts(tripId: string | null | undefined) {
   useEffect(() => {
     if (tripId === undefined) return // still loading trip
     if (tripId === null) {
-      setContacts([])
-      setLoading(false)
+      setContacts([]) // eslint-disable-line react-hooks/set-state-in-effect
+      setLoading(false) // eslint-disable-line react-hooks/set-state-in-effect
       return
     }
 

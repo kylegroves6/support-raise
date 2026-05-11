@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, type ChangeEvent } from 'react'
 import { parseCSV, type ImportDiagnostics } from '../utils/csvParser'
 import type { Contact, ImportMode } from '../types'
 
@@ -15,7 +15,7 @@ export default function CSVImport({ onImport, onClose }: Props) {
   const [showDiag, setShowDiag] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setError(null)

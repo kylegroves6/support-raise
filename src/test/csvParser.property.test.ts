@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
-import { normalizeDateString } from '../utils/csvParser'
+import { normalizeDateString, normalizePhoneString } from '../utils/csvParser'
 
 // ── normalizeDateString property tests ───────────────────────────────────────
 
@@ -197,6 +197,68 @@ describe('legacy Full Name split — property tests', () => {
       const { firstName, lastName } = splitFullName(fullName)
       const rejoined = [firstName, lastName].filter(Boolean).join(' ')
       expect(rejoined).toBe(fullName)
+    }))
+  })
+})
+
+// ── normalizePhoneString property tests ──────────────────────────────────────
+
+describe('normalizePhoneString — property tests', () => {
+  it('always returns a string', () => {
+    fc.assert(fc.property(fc.string(), input => {
+      expect(typeof normalizePhoneString(input)).toBe('string')
+    }))
+  })
+
+  it('never throws', () => {
+    fc.assert(fc.property(fc.string(), input => {
+      expect(() => normalizePhoneString(input)).not.toThrow()
+    }))
+  })
+
+  it('10-digit US numbers always produce XXX-XXX-XXXX', () => {
+    const digit = fc.integer({ min: 0, max: 9 }).map(String)
+    const tenDigits = fc.array(digit, { minLength: 10, maxLength: 10 }).map(a => a.join(''))
+    fc.assert(fc.property(tenDigits, digits => {
+      const result = normalizePhoneString(digits)
+      expect(result).toMatch(/^\d{3}-\d{3}-\d{4}$/)
+    }))
+  })
+
+  it('11-digit US numbers starting with 1 always produce XXX-XXX-XXXX', () => {
+    const digit = fc.integer({ min: 0, max: 9 }).map(String)
+    const tenDigits = fc.array(digit, { minLength: 10, maxLength: 10 }).map(a => a.join(''))
+    fc.assert(fc.property(tenDigits, digits => {
+      const result = normalizePhoneString('1' + digits)
+      expect(result).toMatch(/^\d{3}-\d{3}-\d{4}$/)
+    }))
+  })
+
+  it('output is either empty string, XXX-XXX-XXXX, or the original trimmed value', () => {
+    fc.assert(fc.property(fc.string(), input => {
+      const result = normalizePhoneString(input)
+      const isUSFormat = /^\d{3}-\d{3}-\d{4}$/.test(result)
+      const isEmpty = result === ''
+      const isPassthrough = result === input.trim()
+      expect(isUSFormat || isEmpty || isPassthrough).toBe(true)
+    }))
+  })
+
+  it('whitespace-only strings return empty string', () => {
+    fc.assert(fc.property(
+      fc.array(fc.constantFrom(' ', '\t', '\n'), { maxLength: 20 }).map(a => a.join('')),
+      s => {
+        expect(normalizePhoneString(s)).toBe('')
+      }
+    ))
+  })
+
+  it('idempotent on already-normalized US numbers', () => {
+    const digit = fc.integer({ min: 0, max: 9 }).map(String)
+    const tenDigits = fc.array(digit, { minLength: 10, maxLength: 10 }).map(a => a.join(''))
+    fc.assert(fc.property(tenDigits, digits => {
+      const normalized = normalizePhoneString(digits)
+      expect(normalizePhoneString(normalized)).toBe(normalized)
     }))
   })
 })

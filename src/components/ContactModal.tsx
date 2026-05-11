@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
 import type { Contact } from '../types'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { normalizePhoneString } from '../utils/csvParser'
 
 const RELATIONSHIP_SUGGESTIONS = [
   "Family", "Friend", "Family Friend", "Friend's Parents",
@@ -37,6 +38,7 @@ function parseDeliveryIntents(status: string): Set<DeliveryIntent> {
 
 const GIFT_FORMS = ["", "Online Donation", "Check", "Cash"]
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function validateEmail(email: string): string | null {
   if (!email) return null
   // RFC-5321-lenient: must have @ with non-empty local and domain parts
@@ -44,10 +46,11 @@ export function validateEmail(email: string): string | null {
   return null
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function validatePhone(phone: string): string | null {
   if (!phone) return null
   // Strip common formatting; must have 7–15 digits (international range)
-  const digits = phone.replace(/[\s().+\-]/g, '')
+  const digits = phone.replace(/[\s().+-]/g, '')
   if (!/^\d{7,15}$/.test(digits)) return 'Invalid phone number'
   return null
 }
@@ -58,6 +61,7 @@ export interface GiftValidationError {
   partnerStatus?: string
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function validateGiftFields(
   giftAmount: number,
   formOfGift: string,
@@ -95,8 +99,6 @@ function RelationshipSelect({ value, onChange }: { value: string; onChange: (val
   const [addingNew, setAddingNew] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const knownSuggestions = RELATIONSHIP_SUGGESTIONS.includes(value)
-  const displayValue = value && !knownSuggestions ? value : value
 
   useEffect(() => {
     if (addingNew) inputRef.current?.focus()
@@ -261,7 +263,7 @@ function Toggle({ label, checked, onChange }: ToggleProps) {
   )
 }
 
-function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string | null }) {
+function Field({ label, children, error }: { label: string; children: ReactNode; error?: string | null }) {
   return (
     <label className="block">
       <span className="label">{label}</span>
@@ -378,7 +380,13 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
                 <input className={`input-field ${errors.email ? 'border-red-400 focus:ring-red-200' : ''}`} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
               </Field>
               <Field label="Phone" error={errors.phone}>
-                <input className={`input-field ${errors.phone ? 'border-red-400 focus:ring-red-200' : ''}`} type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} />
+                <input
+                  className={`input-field ${errors.phone ? 'border-red-400 focus:ring-red-200' : ''}`}
+                  type="tel"
+                  value={form.phone}
+                  onChange={e => set('phone', e.target.value)}
+                  onBlur={e => set('phone', normalizePhoneString(e.target.value))}
+                />
               </Field>
             </div>
           </section>

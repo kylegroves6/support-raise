@@ -39,6 +39,11 @@ function fmt(n: number) {
 type SortKey = 'name' | 'relationship' | 'gift'
 type SortDir = 'asc' | 'desc'
 
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (sortKey !== col) return <span className="opacity-30">↕</span>
+  return <span>{sortDir === 'asc' ? '↑' : '↓'}</span>
+}
+
 interface TripDetailProps {
   trip: Trip
   onBack: () => void
@@ -66,11 +71,6 @@ function TripDetail({ trip, onBack }: TripDetailProps) {
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
-  }
-
-  function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <span className="opacity-30">↕</span>
-    return <span>{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
   return (
@@ -113,17 +113,17 @@ function TripDetail({ trip, onBack }: TripDetailProps) {
                   <tr className="border-b border-cream-200">
                     <th className="text-left px-2 py-2 text-xs font-semibold text-stone-warm">
                       <button onClick={() => handleSort('name')} className="flex items-center gap-1 hover:text-stone-dark">
-                        Name <SortIcon col="name" />
+                        Name <SortIcon col="name" sortKey={sortKey} sortDir={sortDir} />
                       </button>
                     </th>
                     <th className="text-left px-2 py-2 text-xs font-semibold text-stone-warm">
                       <button onClick={() => handleSort('relationship')} className="flex items-center gap-1 hover:text-stone-dark">
-                        Relationship <SortIcon col="relationship" />
+                        Relationship <SortIcon col="relationship" sortKey={sortKey} sortDir={sortDir} />
                       </button>
                     </th>
                     <th className="text-right px-2 py-2 text-xs font-semibold text-stone-warm">
                       <button onClick={() => handleSort('gift')} className="flex items-center gap-1 justify-end hover:text-stone-dark ml-auto">
-                        Gift <SortIcon col="gift" />
+                        Gift <SortIcon col="gift" sortKey={sortKey} sortDir={sortDir} />
                       </button>
                     </th>
                   </tr>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseCSV, buildTemplateCSV, buildExportCSV, normalizeDateString } from '../utils/csvParser'
+import { parseCSV, buildTemplateCSV, buildExportCSV, normalizeDateString, normalizePhoneString } from '../utils/csvParser'
 import type { Contact } from '../types'
 
 // New-format headers (split name)
@@ -451,5 +451,61 @@ describe('normalizeDateString', () => {
     const csv = buildCSV([makeRow({ 'Date Received': '-' })])
     const { contacts } = parseCSV(csv)
     expect(contacts[0].dateReceived).toBe('')
+  })
+})
+
+describe('normalizePhoneString', () => {
+  it.each([
+    // 10-digit bare — canonical US format
+    ['5558675309',          '555-867-5309'],
+    // Already-formatted US with dashes
+    ['555-867-5309',        '555-867-5309'],
+    // Parens + space
+    ['(555) 867-5309',      '555-867-5309'],
+    // Dots
+    ['555.867.5309',        '555-867-5309'],
+    // With +1 country code
+    ['+15558675309',        '555-867-5309'],
+    // With 1 country code, no plus
+    ['15558675309',         '555-867-5309'],
+    // With +1 and formatting
+    ['+1 (555) 867-5309',   '555-867-5309'],
+    // Blank / undefined
+    ['',                    ''],
+    [undefined,             ''],
+    ['   ',                 ''],
+    // International — pass through as-is
+    ['+44 20 7946 0958',    '+44 20 7946 0958'],
+    ['+61 2 9876 5432',     '+61 2 9876 5432'],
+    // International numbers whose digit count after stripping could collide with
+    // the 10/11-digit US heuristic — must NOT be treated as US numbers.
+    // UK mobile: +44 strips the + but leaves 12 digits → pass through
+    ['+447911123456',       '+447911123456'],
+    // Mexico: +52 + 10 digits = 12 digits total → pass through
+    ['+5215551234567',      '+5215551234567'],
+    // A bare 10-digit number that starts with a country-code-like prefix but has
+    // no + — the function cannot distinguish it from a US number, so it normalizes.
+    // This documents the known limitation: without a + prefix the function assumes US.
+    ['0207946095',          '020-794-6095'],
+  ])('"%s" → "%s"', (input, expected) => {
+    expect(normalizePhoneString(input)).toBe(expected)
+  })
+
+  it('parseCSV normalizes phone on import (parens format)', () => {
+    const csv = buildCSV([makeRow({ 'Phone': '(555) 867-5309' })])
+    const { contacts } = parseCSV(csv)
+    expect(contacts[0].phone).toBe('555-867-5309')
+  })
+
+  it('parseCSV normalizes phone on import (+1 country code)', () => {
+    const csv = buildCSV([makeRow({ 'Phone': '+15558675309' })])
+    const { contacts } = parseCSV(csv)
+    expect(contacts[0].phone).toBe('555-867-5309')
+  })
+
+  it('parseCSV passes through blank phone as empty string', () => {
+    const csv = buildCSV([makeRow({ 'Phone': '' })])
+    const { contacts } = parseCSV(csv)
+    expect(contacts[0].phone).toBe('')
   })
 })

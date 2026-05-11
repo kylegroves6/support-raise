@@ -21,6 +21,26 @@ function parseIntVal(val: string | undefined): number | null {
   return isNaN(n) ? null : n
 }
 
+// Normalizes US phone numbers to XXX-XXX-XXXX. Strips formatting characters
+// and leading +1/1 country code. International numbers (not 10 or 11 digits
+// after stripping) are passed through as-is.
+export function normalizePhoneString(val: string | undefined): string {
+  if (!val || val.trim() === '') return ''
+  // Strip all formatting: spaces, parens, dots, dashes (keep digits and leading +)
+  const stripped = val.trim().replace(/[\s().+-]/g, '')
+  // US 11-digit with country code 1
+  if (/^1\d{10}$/.test(stripped)) {
+    const d = stripped.slice(1)
+    return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`
+  }
+  // US 10-digit
+  if (/^\d{10}$/.test(stripped)) {
+    return `${stripped.slice(0, 3)}-${stripped.slice(3, 6)}-${stripped.slice(6)}`
+  }
+  // International or unrecognized — return trimmed original
+  return val.trim()
+}
+
 // Normalizes date strings to YYYY-MM-DD. Handles formats that appear in
 // real CSV exports from Excel, Google Sheets, phones, and manual entry:
 //   YYYY-MM-DD            — ISO, pass through
@@ -244,6 +264,8 @@ export function parseCSV(csvText: string): { contacts: Contact[]; diagnostics: I
           mapped[field] = parseGiftAmount(val)
         } else if (field === 'dateReceived') {
           mapped[field] = normalizeDateString(val)
+        } else if (field === 'phone') {
+          (mapped as Record<string, string>)[field] = normalizePhoneString(val)
         } else if (BOOL_FIELDS.has(field)) {
           (mapped as Record<string, boolean>)[field] = parseBool(val)
         } else {

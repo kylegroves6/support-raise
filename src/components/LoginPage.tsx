@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function LoginPage() {
@@ -18,7 +18,7 @@ export default function LoginPage() {
     if (error) setError(error.message)
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setMessage(null)
