@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import type { Contact, Trip } from '../types'
+import type { Contact, HouseholdMember, Trip } from '../types'
 
 export const RELATIONSHIP_SUGGESTIONS = [
   'Family', 'Friend', 'Family Friend', "Friend's Parents",
@@ -30,10 +30,16 @@ interface SavedEntry {
   createdAt: string
 }
 
+interface DuplicateWarning {
+  message: string
+  existingNote?: string
+}
+
 interface Props {
   activeTrip: Trip | null
   contacts: Contact[]
   addContact: (data: Partial<Contact>) => Promise<Contact>
+  addHouseholdMember: (contactId: string, member: Pick<HouseholdMember, 'firstName' | 'lastName' | 'role'>) => Promise<HouseholdMember>
   onCreateTrip: () => void
 }
 
@@ -49,32 +55,74 @@ function normalize(s: string) {
   return s.trim().toLowerCase()
 }
 
-function isDuplicate(contacts: Contact[], firstName: string, lastName: string): boolean {
-  const fn = normalize(firstName)
-  const ln = normalize(lastName)
-  return contacts.some(c => normalize(c.firstName) === fn && normalize(c.lastName) === ln)
-}
-
 /**
- * Returns true when `firstName` matches the spouse embedded in an existing
- * couple's organization string ("Kevin & Sue Smith" → spouse is "Sue").
- * Only fires when lastName also matches the couple's last name.
+ * Detects duplicate/conflict warnings for a given first+last name against the
+ * full contacts list (which includes householdMembers).
+ *
+ * Rules:
+ * - Exact first+last match → warn (includes contacts where primary IS a couple member)
+ * - Last name empty → warn against ALL contacts sharing that first name (any last name)
+ * - Spouse/partner in household_members with matching first+last → warn
+ * - Primary name in household_members (the contact itself) with matching first+last → warn
+ * - Same first name, different non-empty last name → no warning
  */
-function isSpouseDuplicate(contacts: Contact[], firstName: string, lastName: string): boolean {
+function detectWarnings(contacts: Contact[], firstName: string, lastName: string): DuplicateWarning[] {
   const fn = normalize(firstName)
   const ln = normalize(lastName)
-  return contacts.some(c => {
-    if (!c.organization) return false
-    // Match "FirstA & FirstB LastName"
-    const m = c.organization.match(/^.+? & (.+?)(?: (.+))?$/)
-    if (!m) return false
-    const spouseFirst = normalize(m[1] ?? '')
-    const coupleLast = normalize(m[2] ?? c.lastName ?? '')
-    return spouseFirst === fn && (ln === '' || coupleLast === ln)
-  })
+  if (!fn) return []
+
+  const warnings: DuplicateWarning[] = []
+  const seen = new Set<string>() // dedupe by message
+
+  function addWarning(w: DuplicateWarning) {
+    if (!seen.has(w.message)) {
+      seen.add(w.message)
+      warnings.push(w)
+    }
+  }
+
+  for (const c of contacts) {
+    const contactFirst = normalize(c.firstName)
+    const contactLast = normalize(c.lastName)
+    const displayName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.organization || c.firstName
+
+    // Case: last name empty → warn against every contact sharing the first name
+    if (ln === '' && contactFirst === fn) {
+      addWarning({
+        message: `Is this the same as ${displayName}?`,
+        existingNote: c.notes || undefined,
+      })
+      continue
+    }
+
+    // Case: exact primary contact match
+    if (contactFirst === fn && contactLast === ln) {
+      addWarning({
+        message: `${firstName.trim()} ${lastName.trim()} is already in your contacts.`,
+        existingNote: c.notes || undefined,
+      })
+    }
+
+    // Case: matches a household member (spouse/partner/child/other) on this contact
+    for (const m of c.householdMembers ?? []) {
+      const memberFirst = normalize(m.firstName)
+      // member last name: use explicit last name if set, otherwise inherit contact's last name
+      const memberLast = m.lastName !== undefined ? normalize(m.lastName) : contactLast
+
+      if (memberFirst === fn && (ln === '' || memberLast === ln)) {
+        const coupleDisplay = c.organization || displayName
+        addWarning({
+          message: `${firstName.trim()} ${lastName.trim()} may already be in your contacts as part of ${coupleDisplay}.`,
+          existingNote: c.notes || undefined,
+        })
+      }
+    }
+  }
+
+  return warnings
 }
 
-export default function NameStorm({ activeTrip, contacts, addContact, onCreateTrip }: Props) {
+export default function NameStorm({ activeTrip, contacts, addContact, addHouseholdMember, onCreateTrip }: Props) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [spouseFirstName, setSpouseFirstName] = useState('')
@@ -100,20 +148,11 @@ export default function NameStorm({ activeTrip, contacts, addContact, onCreateTr
     }
   }, [isCouple, firstName, lastName, spouseFirstName])
 
-  // Check for duplicate as the user types (exact match or spouse-of-couple match)
-  const duplicateWarning = useMemo(() => {
-    const fn = firstName.trim()
-    const ln = lastName.trim()
-    if (!fn) return null
-    const name = [fn, ln].filter(Boolean).join(' ')
-    if (isDuplicate(contacts, fn, ln)) {
-      return `${name} is already in your contacts. Add a note to differentiate, or skip.`
-    }
-    if (isSpouseDuplicate(contacts, fn, ln)) {
-      return `${name} appears to be a spouse in an existing couple entry. Add a note to differentiate, or skip.`
-    }
-    return null
-  }, [firstName, lastName, contacts])
+  // Compute warnings live as the user types
+  const duplicateWarnings = useMemo(
+    () => detectWarnings(contacts, firstName, lastName),
+    [firstName, lastName, contacts]
+  )
 
   const clearForm = useCallback(() => {
     setFirstName('')
@@ -153,6 +192,16 @@ export default function NameStorm({ activeTrip, contacts, addContact, onCreateTr
         notes: nt || undefined,
         relationship,
       })
+
+      // Save spouse as a household member when couple mode is on
+      if (isCouple && spouseFirstName.trim()) {
+        await addHouseholdMember(contact.id, {
+          firstName: spouseFirstName.trim(),
+          lastName: undefined, // inherits contact's last name
+          role: 'spouse',
+        })
+      }
+
       const entry: SavedEntry = {
         id: contact.id,
         firstName: fn,
@@ -186,13 +235,17 @@ export default function NameStorm({ activeTrip, contacts, addContact, onCreateTr
     }
   }
 
-  // Space after a non-empty first name advances to last name field.
-  // This lets you type "Kyle " and land in last name without lifting your hands.
-  // Does nothing if the field is empty (avoids swallowing accidental spaces).
+  // Space advances to last name only when the cursor is at the end of the input.
+  // Mid-string spaces (e.g. editing) fall through to normal browser handling.
   function handleFirstNameKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === ' ' && firstName.trim().length > 0) {
-      e.preventDefault()
-      lastNameRef.current?.focus()
+    if (e.key === ' ') {
+      const val = e.currentTarget.value
+      const cursorAtEnd = e.currentTarget.selectionEnd === val.length
+      if (val.trim().length > 0 && cursorAtEnd) {
+        e.preventDefault()
+        lastNameRef.current?.focus()
+        return
+      }
       return
     }
     handleKeyDown(e)
@@ -369,11 +422,18 @@ export default function NameStorm({ activeTrip, contacts, addContact, onCreateTr
         </div>
       )}
 
-      {/* ── Duplicate warning (soft — user can still proceed) ── */}
-      {duplicateWarning && (
-        <p data-testid="duplicate-warning" className="text-sm text-amber-600">
-          ⚠ {duplicateWarning}
-        </p>
+      {/* ── Duplicate warnings (inline, stacked) ── */}
+      {duplicateWarnings.length > 0 && (
+        <ul data-testid="duplicate-warning" className="space-y-1">
+          {duplicateWarnings.map((w, i) => (
+            <li key={i} className="text-sm text-amber-600">
+              <span>⚠ {w.message}</span>
+              {w.existingNote && (
+                <span className="ml-1 text-xs text-stone-warm italic">Note on file: &ldquo;{w.existingNote}&rdquo;</span>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
 
       {errorMsg && (

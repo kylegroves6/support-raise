@@ -30,6 +30,9 @@ dist-ssr
 data/
 exports/
 
+# Schema backups — local only, not for version control
+backups/
+
 # Environment / secrets
 .env
 .env.*

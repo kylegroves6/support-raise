@@ -1,3 +1,12 @@
+export interface HouseholdMember {
+  id: string
+  contactId: string
+  firstName: string
+  lastName?: string  // null = shares contact's last name
+  role: 'spouse' | 'partner' | 'child' | 'other'
+  createdAt?: string
+}
+
 export interface Contact {
   id: string
   firstName: string
@@ -32,6 +41,8 @@ thankYouSent: boolean
   dateReceived: string
   // present when loaded with trip data
   contactTripId?: string
+  // household members loaded alongside the contact
+  householdMembers?: HouseholdMember[]
 }
 
 export interface Trip {
