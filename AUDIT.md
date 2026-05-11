@@ -65,10 +65,11 @@ Extracted to `src/lib/auth.ts`. All three hooks (`useContacts`, `useTrips`, `use
 
 ### C6. Remove `uuid` package dependency — ✅ Done (removed in earlier session).
 
-### C7. `returning` field reads stale DB column
-**File:** `src/hooks/useContacts.ts:51`
-**Problem:** `fromContactRow()` reads `returning` from the DB, but line 136 immediately overwrites it with a derived value from trip history. The DB column read is dead code and misleading.
-**Fix:** Remove `returning` from `fromContactRow()` — it's always overridden two lines later.
+### C7. `returning` field dummy value in `fromContactRow()`
+**File:** `src/hooks/useContacts.ts:55`
+**Problem:** `fromContactRow()` hardcodes `returning: false` as a placeholder, but every call site immediately overwrites it with the real derived value (see lines 130–135). The `false` is never visible to any caller — dead on arrival.
+**Business rule:** `returning` means the contact was a financial partner (`financial_partner = true`) on any trip *other than* the current one. This distinguishes contacts who have actually donated before from contacts who are simply carrying over from a prior trip without having given. It drives UI distinction between "returning donor" and "carried-over contact."
+**Fix:** Remove `returning` from `fromContactRow()` — it's always overridden at call sites. Low priority, nothing broken.
 
 ---
 

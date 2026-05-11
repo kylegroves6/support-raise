@@ -212,6 +212,7 @@ events — decide when the workflow is clearer from real use.
 - **Supabase URL + publishable key are not secrets** — go in `.env` and Vercel env vars
 - **Bitwarden Secrets Manager** — reserved for Phase 2 Anthropic API key
 - **`returning` is a Postgres reserved word** — must be quoted as `"returning"` in SQL
+- **`returning` field is derived, not stored** — computed at query time from `contact_trips` history: a contact is "returning" if they have `financial_partner = true` on any trip *other than* the current one. Distinguishes contacts who have actually donated on a prior trip from contacts who simply carried over without giving. Original DB column was dropped; value is now set at the call site in `useContacts.ts` after `fromContactRow()` runs.
 - **camelCase ↔ snake_case mapping** lives in `useContacts.ts`
 - **RLS uses `(SELECT auth.uid())` pattern** — evaluated once per query, not per row
 - **No SQL Editor / dashboard for DDL** — migrations only
