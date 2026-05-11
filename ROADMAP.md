@@ -1,16 +1,17 @@
 # Support Raising Tracker — Roadmap
 
-## Current State (v0.7 — May 2026)
+## Current State (v0.8 — May 2026)
 
 - Vite + React + TypeScript + Tailwind SPA
 - Supabase for database (Postgres), auth, and RLS
 - No server-side component — Supabase JS client called directly from React hooks
 - Supabase CLI linked for migrations
 - Deployed to Vercel; installable as PWA on iOS/Android home screen
-- 72 unit tests passing (csvParser + useContacts hook)
-- Playwright E2E: 5 golden-path tests written and green against local Supabase
+- 137 unit tests passing (csvParser, useContacts, contactValidation, csvParser.property)
+- Playwright E2E: 8 golden-path tests green against local Supabase
 - Sentry initialized with Session Replay (`VITE_SENTRY_DSN` env var — add to Vercel)
 - `activity_log` table live in production, accumulating data
+- Pre-Phase 2 hardening complete: validation, constrained selects, fuzz testing
 
 ### Migration hygiene rule (absolute)
 Every schema change must:
@@ -24,8 +25,7 @@ out-of-band). It is identical to local `20260510002000_add_activity_log.sql`. No
 needed — schema is correct, just the migration history record is duplicated on remote.
 
 ### Known issues / tech debt
-- `full_name` column still exists on `contacts` — kept for backwards compat but no longer
-  read by the app. Can be dropped in a future cleanup migration once confident.
+- `full_name` column dropped in migration `20260510004000` — complete. No action needed.
 - Remote migration list has the orphan `20260510192920` entry — cosmetic only.
 - Small-screen PWA layout not fully reviewed.
 
@@ -64,74 +64,118 @@ Core CRUD, auth, RLS, trips, goals, CSV import/export, additional raising items.
 
 ---
 
-## Pre-Phase 2 hardening (next — must complete before Phase 2 features)
+## Pre-Phase 2 hardening ✓
 
-### ContactModal fixes
-- Move Organization field up directly after Last Name (context when no last name exists)
-- Email format validation (inline error, blocks save)
-- Phone format validation (lenient — US + international)
-- If gift amount > 0: require Form of Gift, Date Received, and either Financial Partner or Pledged to Give
-- If Financial Partner checked: auto-set Contacted = true
-- Country → searchable select with fixed list, default United States
+- ✅ ContactModal: Organization moved directly after Last Name
+- ✅ Relationship field: free-text combobox → constrained Radix Select + "Add new…" escape hatch
+- ✅ Country field: free-text → searchable select (~60 countries, default United States, clearable)
+- ✅ Email validation: format check on save, inline error, blocks save
+- ✅ Phone validation: lenient US + international, inline error, blocks save
+- ✅ Gift amount > 0: requires Form of Gift, Date Received, and Financial Partner or Pledged to Give
+- ✅ Financial Partner auto-sets Contacted = true
+- ✅ `normalizeDateString` expanded: handles ISO, US slash, US dash, European dot, long/short month names
+- ✅ Import modal: date format hint shown to users
+- ✅ Unit tests: 137 passing (was 72) — contactValidation.test.ts added (32 tests)
+- ✅ Property-based fuzz tests: `fast-check` installed; csvParser.property.test.ts added
+- ✅ E2E tests: 8 passing (was 5) — gift validation flows and FP auto-set covered
+- ✅ Template CSV: auto-derived from COLUMN_MAP, stays in sync; round-trip test guards against drift
 
-### Relationship field — constrained list
-- Replace free-text combobox with enforced select + "Add new…" escape hatch
-- Consistent values required for AI letter drafting to produce consistent tone
-- Also enables relationship breakdown reporting (Phase 2/3)
-
-### Testing gate
-- Unit tests for all new validation logic
-- E2E tests for gift amount / partner status flows
-- Property-based fuzz testing with `fast-check` targeting `csvParser.ts`
-  (`normalizeDateString`, `parseGiftAmount`, legacy name split)
-- All 72 existing tests must keep passing; Playwright must stay green
+### Deferred to Phase 2 backlog
+- Phone normalization on import (`normalizePhoneString` — strip formatting to consistent hyphen-delimited form, normalize on blur in ContactModal)
+- CI: gate Vercel preview deploys on Playwright passing
 
 ---
 
-## Phase 2 — Print + AI
+## Phase 2 — Multi-user readiness + quality of life
 
-### Couple / family contact model
-- Use `organization` for couples/families ("Kevin & Sue Smith", "Raines Family")
-- `firstName`/`lastName` = primary contact person; `salutation` = letter greeting
-- Full envelope addressing design deferred to letter formatter
+Priority order reflects what provides value now, before opening the app to other users.
+AI/letter drafting deferred to Phase 2.5 — not needed until active letter-writing season.
 
-### Letter and envelope formatter
-- Three output formats: mailed letter (one-page), email, text/SMS
-- Mailed letter: address block, salutation, body sections, signature
-- Pre-structured sections user can lock/unlock: opening, personal connection, ask, closing
-- Tone controls: formality slider, warmth, length
-- Salutation handling for couples/families ("Dear Kevin and Sue," / "Dear Smith Family,")
-- Envelope print layout: return address + recipient address block
-- Thank-you note formatter (same pipeline, different template)
+### Security hardening (do first — required before other users)
+- Run `npm audit` and resolve any high/critical CVEs in the dependency tree
+- Add `eslint-plugin-security` or similar to catch obvious injection patterns at lint time
+- Review all Supabase RLS policies against the current schema — confirm no table is readable cross-user
+- Rate limiting: Supabase's built-in auth rate limits are on by default; confirm Edge Functions (when added) are protected
+- CSP headers: add `Content-Security-Policy` to Vercel config to restrict script/connect sources
+- No secrets in client bundle: audit that no service-role key or API key is reachable from the browser
 
-### AI writing assistant
-- Claude API via Supabase Edge Function (keeps API key server-side)
-- Inputs: trip details, contact name, relationship, stage (pre-send / follow-up / thank-you), notes, output format, tone settings
-- Relationship field used to calibrate tone/phrasing — requires consistent values (enforced in pre-Phase 2)
-- User always reviews and edits — AI drafts structure/tone, never writes the final copy
-- Anthropic API key stored in Bitwarden Secrets Manager, injected into Edge Function env
+### Phone normalization on import
+- Add `normalizePhoneString` to `csvParser.ts`: strip formatting (parens, dots, spaces) → consistent hyphen-delimited form on import
+- Normalize on blur in ContactModal (not on keystroke — don't fight the user while typing)
+- Add unit tests and property-based fuzz tests
 
-### Relationship breakdown report
-- Pie/bar chart: gift dollars received broken down by relationship category
-- Useful personal insight; more valuable at coach/org level (Phase 3)
-- Requires consistent relationship values — blocked on constrained list (pre-Phase 2)
+### Trip creation / editing E2E tests
+- E2E test: create a new trip, verify dashboard updates with correct trip name and dates
+- E2E test: days-until-departure math — verify displayed count is correct for a known future date
+- E2E test: set trip cost + additional raising items, verify total goal math on dashboard
+- These guard against regressions when trip/goal logic changes
 
 ### Quick-add contact form
 - Minimal inline form in ContactsTable (name + relationship only) for fast list-building
 - Needs: active trip ID at insert time, surface DB errors to user, Supabase mock for tests
 
+### Relationship breakdown report
+- Pie/bar chart: gift dollars broken down by relationship category
+- Personal insight: "most support came from church friends"
+- Requires consistent relationship values — now enforced; unblocked
+- Deferred until enough data exists to make it meaningful
+
 ### Activity heatmap on Dashboard
 - Built and removed in Phase 1.6 (ActivityChart.tsx exists, just not rendered)
-- Revisit here alongside print/AI features
 - 52-week rolling heatmap, CSS grid, hover tooltip by event type
+- Revisit when dashboard feels sparse or user has enough history to make it useful
+
+### Group / parent trip model (architecture decision required)
+Current schema: each user has one active `trip` at a time. For multi-person support trips
+(e.g. a Cru summer mission team where multiple students fundraise for the same trip):
+
+**Option A — parent trip + member trips (junction table)**
+- Add `parent_trip_id` FK on `trips` table (nullable)
+- A "parent trip" has no contacts of its own — it's the shared mission
+- Each student's trip links to the parent; their contacts and goals are their own
+- Coach dashboard (Phase 3) aggregates across all member trips for a given parent
+- Enables: "how is the team doing overall?" without merging contact lists
+
+**Option B — org-level trip template**
+- Similar to Phase 3 org isolation — a trip template is owned by an org, not a user
+- More complex; only needed if the org (Cru) wants to create trips that students join
+- Integration with Cru's existing summer mission application is possible here
+
+**Decision deferred** — needs clarity on whether the use case is:
+(a) personal tracking by individual students who happen to share a trip, or
+(b) a Cru staff member creating and managing a trip that students get added to
+Document the answer before writing any schema migration.
 
 ### Change data capture (old/new values in activity_log)
 Add `old_value JSONB` and `new_value JSONB` to `activity_log`.
 Deferred: single-user app has no audit conflict risk yet. Do this when Phase 3 ships.
 
 ### Multiple follow-ups
-`call_made` is boolean — one follow-up per trip. Decide: count column vs. repeated
-`activity_log` events when letter formatting workflow is clearer.
+`call_made` is boolean — one follow-up per trip. Count column vs. repeated `activity_log`
+events — decide when the workflow is clearer from real use.
+
+---
+
+## Phase 2.5 — Print + AI (deferred — not needed until active letter-writing season)
+
+### Letter and envelope formatter
+- Three output formats: mailed letter (one-page), email, text/SMS
+- Pre-structured sections user can lock/unlock: opening, personal connection, ask, closing
+- Tone controls: formality slider, warmth, length
+- Salutation handling for couples/families
+- Envelope print layout: return address + recipient address block
+- Thank-you note formatter (same pipeline, different template)
+
+### AI writing assistant
+- Claude API via Supabase Edge Function (keeps API key server-side)
+- Inputs: trip details, contact name, relationship, stage, notes, output format, tone settings
+- Relationship field calibrates tone — consistent values now enforced (unblocked)
+- User always reviews and edits — AI drafts structure/tone, never writes the final copy
+- Anthropic API key stored in Bitwarden Secrets Manager, injected into Edge Function env
+
+### Couple / family contact model refinement
+- `organization` for couples/families ("Kevin & Sue Smith", "Raines Family")
+- Full envelope addressing design — make tradeoffs concrete here
 
 ---
 
@@ -160,8 +204,14 @@ Deferred: single-user app has no audit conflict risk yet. Do this when Phase 3 s
 - **RLS uses `(SELECT auth.uid())` pattern** — evaluated once per query, not per row
 - **No SQL Editor / dashboard for DDL** — migrations only
 - **`salutation` kept** — useful for letter drafting; auto-populated from `first_name` in UI
-- **`full_name` not dropped yet** — still exists in DB, not read by app; drop in future cleanup
+- **`full_name` dropped** — migration `20260510004000_drop_full_name.sql` applied to prod; column is gone
 - **Activity heatmap removed from Dashboard** — built and reverted; `useActivityLog` hook kept
   for "Follow-up Needed" chip; heatmap can be revisited in Phase 2 alongside print/AI features
 - **Couple/family names** — backfill left as-is for existing contacts; new contacts enforce
   separate first/last fields; display_name or organization override approach deferred to Phase 2
+- **Relationship field is now a constrained select** — "Add new…" escape hatch saves custom values; required for consistent AI tone prompting in Phase 2
+- **Country field is a searchable select** — ~60 countries inline in ContactModal, no external package; defaults to United States
+- **Template CSV is auto-derived from COLUMN_MAP** — no manual sync needed; example row values are the only manual maintenance; round-trip unit test guards against column drift
+- **Phone normalization deferred** — `normalizePhoneString` planned for Phase 2 backlog (strip formatting on import + normalize on blur in ContactModal)
+- **Playwright Radix Select pattern** — options render in a portal; use `page.locator('[role="option"]', { hasText: '...' })` not `getByRole('option')`
+- **Property-based testing with fast-check** — installed as devDep; used for csvParser functions where input space is large and functions are pure

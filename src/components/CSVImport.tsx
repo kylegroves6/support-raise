@@ -77,6 +77,9 @@ export default function CSVImport({ onImport, onClose }: Props) {
           <p className="text-sm text-stone-warm">
             Upload a CSV exported from your Google Sheet. Column headers must match exactly.
           </p>
+          <p className="text-xs text-stone-warm">
+            Date Received accepts most common formats — YYYY-MM-DD, M/D/YYYY, M-D-YYYY, DD.MM.YYYY, or "January 5, 2026".
+          </p>
 
           <div
             className="border-2 border-dashed border-cream-300 rounded-xl p-8 text-center cursor-pointer hover:border-sage-300 hover:bg-sage-50 transition-colors"

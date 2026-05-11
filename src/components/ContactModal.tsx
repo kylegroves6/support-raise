@@ -8,6 +8,21 @@ const RELATIONSHIP_SUGGESTIONS = [
   "Teacher / Professor", "Mentor", "Community Leader", "Former Employer",
 ]
 
+// Country list — abbreviated but covers the vast majority of use cases
+const COUNTRIES = [
+  "United States", "Canada", "Mexico", "United Kingdom", "Australia",
+  "New Zealand", "Ireland", "Germany", "France", "Spain", "Italy",
+  "Netherlands", "Belgium", "Switzerland", "Sweden", "Norway", "Denmark",
+  "Finland", "Austria", "Portugal", "Poland", "Czech Republic", "Hungary",
+  "Romania", "Greece", "Turkey", "Israel", "South Africa", "Nigeria",
+  "Kenya", "Ghana", "Egypt", "Brazil", "Argentina", "Colombia", "Chile",
+  "Peru", "Venezuela", "Ecuador", "Bolivia", "Paraguay", "Uruguay",
+  "Japan", "China", "South Korea", "India", "Pakistan", "Bangladesh",
+  "Indonesia", "Philippines", "Thailand", "Vietnam", "Malaysia", "Singapore",
+  "Hong Kong", "Taiwan", "Russia", "Ukraine", "Kazakhstan", "Saudi Arabia",
+  "UAE", "Qatar", "Kuwait", "Jordan", "Lebanon", "Iraq", "Iran",
+]
+
 const DELIVERY_INTENTS = ['Send by Mail', 'Hand Delivery', 'Digital Contact'] as const
 type DeliveryIntent = typeof DELIVERY_INTENTS[number]
 
@@ -20,8 +35,43 @@ function parseDeliveryIntents(status: string): Set<DeliveryIntent> {
   return set
 }
 
-
 const GIFT_FORMS = ["", "Online Donation", "Check", "Cash"]
+
+export function validateEmail(email: string): string | null {
+  if (!email) return null
+  // RFC-5321-lenient: must have @ with non-empty local and domain parts
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Invalid email address'
+  return null
+}
+
+export function validatePhone(phone: string): string | null {
+  if (!phone) return null
+  // Strip common formatting; must have 7–15 digits (international range)
+  const digits = phone.replace(/[\s().+\-]/g, '')
+  if (!/^\d{7,15}$/.test(digits)) return 'Invalid phone number'
+  return null
+}
+
+export interface GiftValidationError {
+  formOfGift?: string
+  dateReceived?: string
+  partnerStatus?: string
+}
+
+export function validateGiftFields(
+  giftAmount: number,
+  formOfGift: string,
+  dateReceived: string,
+  financialPartner: boolean,
+  pledgedToGive: boolean,
+): GiftValidationError {
+  if (giftAmount <= 0) return {}
+  const errors: GiftValidationError = {}
+  if (!formOfGift) errors.formOfGift = 'Form of Gift is required when a gift amount is entered'
+  if (!dateReceived) errors.dateReceived = 'Date Received is required when a gift amount is entered'
+  if (!financialPartner && !pledgedToGive) errors.partnerStatus = 'Mark as Financial Partner or Pledged to Give when a gift amount is entered'
+  return errors
+}
 
 type ContactFormState = Omit<Contact, 'id' | 'topPriority' | 'giftAmount' | 'createdAt' | 'updatedAt'> & {
   topPriority: string
@@ -32,18 +82,84 @@ const BLANK_CONTACT: ContactFormState = {
   firstName: '', lastName: '', organization: '', relationship: '', returning: false, topPriority: '',
   addressStatus: '', sent: false, salutation: '',
   thankYouSent: false,
-  notes: '', streetAddress: '', city: '', state: '', zip: '', country: '',
+  notes: '', streetAddress: '', city: '', state: '', zip: '', country: 'United States',
   concatenatedAddress: '', phone: '', followedUp: false, email: '',
   responded: false, financialPartner: false, prayerPartner: false, pledgedToGive: false,
   formOfGift: '', giftAmount: '', dateReceived: '',
 }
 
-function RelationshipCombobox({ value, onChange }: { value: string; onChange: (val: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState(value)
-  const ref = useRef<HTMLDivElement>(null)
+// ── Relationship select with "Add new…" escape hatch ─────────────────────────
 
-  useEffect(() => { setQuery(value) }, [value])
+function RelationshipSelect({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  const [customValue, setCustomValue] = useState('')
+  const [addingNew, setAddingNew] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const knownSuggestions = RELATIONSHIP_SUGGESTIONS.includes(value)
+  const displayValue = value && !knownSuggestions ? value : value
+
+  useEffect(() => {
+    if (addingNew) inputRef.current?.focus()
+  }, [addingNew])
+
+  function commitCustom() {
+    const v = customValue.trim()
+    if (v) onChange(v)
+    setAddingNew(false)
+    setCustomValue('')
+  }
+
+  if (addingNew) {
+    return (
+      <div className="flex gap-2">
+        <input
+          ref={inputRef}
+          className="input-field flex-1"
+          placeholder="Enter relationship…"
+          value={customValue}
+          onChange={e => setCustomValue(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') { e.preventDefault(); commitCustom() }
+            if (e.key === 'Escape') { setAddingNew(false); setCustomValue('') }
+          }}
+        />
+        <button type="button" className="btn-secondary text-sm px-3" onClick={commitCustom}>OK</button>
+        <button type="button" className="btn-ghost text-sm px-3" onClick={() => { setAddingNew(false); setCustomValue('') }}>✕</button>
+      </div>
+    )
+  }
+
+  return (
+    <Select
+      value={value}
+      onValueChange={v => {
+        if (v === '__add_new__') { setAddingNew(true); return }
+        onChange(v === '__none__' ? '' : v)
+      }}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="Choose…">
+          {value && !RELATIONSHIP_SUGGESTIONS.includes(value) ? value : undefined}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none__">— None —</SelectItem>
+        {RELATIONSHIP_SUGGESTIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+        {value && !RELATIONSHIP_SUGGESTIONS.includes(value) && (
+          <SelectItem value={value}>{value}</SelectItem>
+        )}
+        <SelectItem value="__add_new__" className="text-sage-600 font-medium">Add new…</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
+// ── Country searchable select ─────────────────────────────────────────────────
+
+function CountrySelect({ value, onChange }: { value: string; onChange: (val: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -54,44 +170,76 @@ function RelationshipCombobox({ value, onChange }: { value: string; onChange: (v
   }, [])
 
   const filtered = query.trim()
-    ? RELATIONSHIP_SUGGESTIONS.filter(r => r.toLowerCase().includes(query.toLowerCase()))
-    : RELATIONSHIP_SUGGESTIONS
+    ? COUNTRIES.filter(c => c.toLowerCase().includes(query.toLowerCase()))
+    : COUNTRIES
 
-  function select(val: string) {
-    onChange(val)
-    setQuery(val)
+  function select(country: string) {
+    onChange(country)
+    setQuery('')
+    setOpen(false)
+  }
+
+  function clear() {
+    onChange('')
+    setQuery('')
     setOpen(false)
   }
 
   return (
     <div className="relative" ref={ref}>
-      <input
-        className="input-field"
-        value={query}
-        placeholder="Type or choose…"
-        onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true) }}
-        onFocus={() => setOpen(true)}
-        autoComplete="off"
-      />
-      {open && filtered.length > 0 && (
+      <div className="relative flex items-center">
+        <input
+          className="input-field pr-8"
+          value={open ? query : (value || '')}
+          placeholder="Search country…"
+          onChange={e => { setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => { setQuery(''); setOpen(true) }}
+          autoComplete="off"
+          aria-label="Country"
+        />
+        {value && !open && (
+          <button
+            type="button"
+            className="absolute right-2 text-stone-warm hover:text-stone-dark text-lg leading-none"
+            onClick={clear}
+            tabIndex={-1}
+            aria-label="Clear country"
+          >
+            ×
+          </button>
+        )}
+      </div>
+      {open && (
         <div className="absolute z-50 mt-1 w-full bg-white border border-cream-200 rounded-xl shadow-modal overflow-hidden">
-          <div className="max-h-48 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#c4b5a8_transparent] [&::-webkit-scrollbar]:block [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-light">
-            {filtered.map(r => (
+          <div className="max-h-48 overflow-y-auto [scrollbar-width:thin]">
+            <button
+              type="button"
+              className="w-full text-left px-3 py-1.5 text-sm text-stone-warm hover:bg-sage-50 border-b border-cream-100"
+              onMouseDown={e => { e.preventDefault(); clear() }}
+            >
+              — None / Unknown —
+            </button>
+            {filtered.map(c => (
               <button
-                key={r}
+                key={c}
                 type="button"
-                className={`w-full text-left px-3 py-1.5 text-sm transition-colors hover:bg-sage-50 hover:text-sage-700 ${value === r ? 'text-sage-700 font-medium' : 'text-stone-dark'}`}
-                onMouseDown={e => { e.preventDefault(); select(r) }}
+                className={`w-full text-left px-3 py-1.5 text-sm transition-colors hover:bg-sage-50 hover:text-sage-700 ${value === c ? 'text-sage-700 font-medium' : 'text-stone-dark'}`}
+                onMouseDown={e => { e.preventDefault(); select(c) }}
               >
-                {r}
+                {c}
               </button>
             ))}
+            {filtered.length === 0 && (
+              <p className="px-3 py-2 text-sm text-stone-warm">No matches</p>
+            )}
           </div>
         </div>
       )}
     </div>
   )
 }
+
+// ── Shared primitives ─────────────────────────────────────────────────────────
 
 interface ToggleProps {
   label: string
@@ -113,11 +261,12 @@ function Toggle({ label, checked, onChange }: ToggleProps) {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string | null }) {
   return (
     <label className="block">
       <span className="label">{label}</span>
       {children}
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </label>
   )
 }
@@ -133,9 +282,16 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
   const isNew = !contact
   const [form, setForm] = useState<ContactFormState>(
     contact
-      ? { ...contact, giftAmount: contact.giftAmount != null ? String(contact.giftAmount) : '', topPriority: contact.topPriority != null ? String(contact.topPriority) : '' }
+      ? { ...contact, giftAmount: contact.giftAmount != null ? String(contact.giftAmount) : '', topPriority: contact.topPriority != null ? String(contact.topPriority) : '', country: contact.country || 'United States' }
       : BLANK_CONTACT
   )
+  const [errors, setErrors] = useState<{
+    email?: string | null
+    phone?: string | null
+    giftFormOfGift?: string
+    giftDateReceived?: string
+    giftPartnerStatus?: string
+  }>({})
 
   function set<K extends keyof ContactFormState>(key: K, val: ContactFormState[K]) {
     setForm(f => {
@@ -144,16 +300,46 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
       if (key === 'firstName' && isNew && !f.salutation) {
         next.salutation = val as string
       }
+      // Financial Partner auto-sets Contacted
+      if (key === 'financialPartner' && val === true) {
+        next.sent = true
+      }
       return next
     })
+    // Clear relevant errors on change
+    if (key === 'email') setErrors(e => ({ ...e, email: null }))
+    if (key === 'phone') setErrors(e => ({ ...e, phone: null }))
+    if (key === 'formOfGift') setErrors(e => ({ ...e, giftFormOfGift: undefined }))
+    if (key === 'dateReceived') setErrors(e => ({ ...e, giftDateReceived: undefined }))
+    if (key === 'financialPartner' || key === 'pledgedToGive') setErrors(e => ({ ...e, giftPartnerStatus: undefined }))
+    if (key === 'giftAmount') setErrors(e => ({ ...e, giftFormOfGift: undefined, giftDateReceived: undefined, giftPartnerStatus: undefined }))
   }
 
   function handleSave() {
     const giftAmount = form.giftAmount === '' ? 0 : parseFloat(String(form.giftAmount).replace(/[$,]/g, '')) || 0
     const topPriority = form.topPriority === '' ? null : parseInt(form.topPriority, 10)
     const responded = form.responded || form.financialPartner || form.prayerPartner || giftAmount > 0
+
+    // Validate
+    const emailErr = validateEmail(form.email)
+    const phoneErr = validatePhone(form.phone)
+    const giftErrors = validateGiftFields(giftAmount, form.formOfGift, form.dateReceived, form.financialPartner, form.pledgedToGive)
+    const hasErrors = emailErr || phoneErr || Object.keys(giftErrors).length > 0
+
+    setErrors({
+      email: emailErr,
+      phone: phoneErr,
+      giftFormOfGift: giftErrors.formOfGift,
+      giftDateReceived: giftErrors.dateReceived,
+      giftPartnerStatus: giftErrors.partnerStatus,
+    })
+
+    if (hasErrors) return
+
     onSave({ ...form, giftAmount, topPriority, responded })
   }
+
+  const isNonUS = form.country && form.country !== 'United States'
 
   return (
     <div className="fixed inset-0 bg-stone-dark/40 flex items-start justify-center z-50 p-4 overflow-y-auto">
@@ -179,7 +365,7 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
                 <input className="input-field" value={form.organization ?? ''} onChange={e => set('organization', e.target.value)} />
               </Field>
               <Field label="Relationship">
-                <RelationshipCombobox value={form.relationship} onChange={v => set('relationship', v)} />
+                <RelationshipSelect value={form.relationship} onChange={v => set('relationship', v)} />
               </Field>
               <Field label="Salutation">
                 <input className="input-field" value={form.salutation} onChange={e => set('salutation', e.target.value)} />
@@ -188,11 +374,11 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
                 <input className="input-field" type="number" min="1" max="3" placeholder="1–3 or blank"
                   value={form.topPriority} onChange={e => set('topPriority', e.target.value)} />
               </Field>
-              <Field label="Email">
-                <input className="input-field" type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+              <Field label="Email" error={errors.email}>
+                <input className={`input-field ${errors.email ? 'border-red-400 focus:ring-red-200' : ''}`} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
               </Field>
-              <Field label="Phone">
-                <input className="input-field" type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} />
+              <Field label="Phone" error={errors.phone}>
+                <input className={`input-field ${errors.phone ? 'border-red-400 focus:ring-red-200' : ''}`} type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} />
               </Field>
             </div>
           </section>
@@ -207,14 +393,14 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
                 <Field label="City">
                   <input className="input-field" value={form.city} onChange={e => set('city', e.target.value)} />
                 </Field>
-                <Field label={form.country && form.country.toLowerCase() !== 'us' && form.country.toLowerCase() !== 'usa' && form.country !== '' ? 'County / Region' : 'State'}>
+                <Field label={isNonUS ? 'County / Region' : 'State'}>
                   <input className="input-field" value={form.state} onChange={e => set('state', e.target.value)} />
                 </Field>
-                <Field label={form.country && form.country.toLowerCase() !== 'us' && form.country.toLowerCase() !== 'usa' && form.country !== '' ? 'Postcode' : 'Zip'}>
+                <Field label={isNonUS ? 'Postcode' : 'Zip'}>
                   <input className="input-field" value={form.zip} onChange={e => set('zip', e.target.value)} />
                 </Field>
                 <Field label="Country">
-                  <input className="input-field" placeholder="Leave blank for US" value={form.country} onChange={e => set('country', e.target.value)} />
+                  <CountrySelect value={form.country} onChange={v => set('country', v)} />
                 </Field>
               </div>
               <div>
@@ -224,7 +410,6 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
                     const current = parseDeliveryIntents(form.addressStatus)
                     const checked = current.has(intent)
                     function select() {
-                      // clicking the active option deselects; otherwise exclusively selects
                       set('addressStatus', checked ? '' : intent)
                     }
                     return (
@@ -278,10 +463,13 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
             <p className="text-xs text-stone-warm mt-2">
               Use <strong>Prayer Partner</strong> or <strong>Financial Partner</strong> to record their decision. Prayer-only means they're supportive but not giving financially.
             </p>
+            {errors.giftPartnerStatus && (
+              <p className="mt-2 text-xs text-red-500">{errors.giftPartnerStatus}</p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-              <Field label="Form of Gift">
+              <Field label="Form of Gift" error={errors.giftFormOfGift}>
                 <Select value={form.formOfGift} onValueChange={v => set('formOfGift', v === '__none__' ? '' : v)}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className={`w-full ${errors.giftFormOfGift ? 'border-red-400' : ''}`}>
                     <SelectValue placeholder="— None —" />
                   </SelectTrigger>
                   <SelectContent>
@@ -297,8 +485,8 @@ export default function ContactModal({ contact, onSave, onDelete, onClose }: Pro
                     value={form.giftAmount} onChange={e => set('giftAmount', e.target.value)} />
                 </div>
               </Field>
-              <Field label="Date Received">
-                <input className="input-field" type="date" value={form.dateReceived}
+              <Field label="Date Received" error={errors.giftDateReceived}>
+                <input className={`input-field ${errors.giftDateReceived ? 'border-red-400' : ''}`} type="date" value={form.dateReceived}
                   onChange={e => set('dateReceived', e.target.value)} />
               </Field>
             </div>

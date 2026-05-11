@@ -21,20 +21,61 @@ function parseIntVal(val: string | undefined): number | null {
   return isNaN(n) ? null : n
 }
 
-// Normalizes date strings to YYYY-MM-DD. Handles:
-//   M/D/YY and M/D/YYYY (slash-delimited, US order)
-//   YYYY-MM-DD (already correct — pass through)
-// Anything unrecognized is returned as empty string.
+// Normalizes date strings to YYYY-MM-DD. Handles formats that appear in
+// real CSV exports from Excel, Google Sheets, phones, and manual entry:
+//   YYYY-MM-DD            — ISO, pass through
+//   M/D/YY, M/D/YYYY      — US slash (Excel default)
+//   MM-DD-YYYY, M-D-YYYY  — US dash
+//   MM-DD-YY, M-D-YY      — US dash short year
+//   DD.MM.YYYY            — European dot (common in Google Sheets locale)
+//   Month D, YYYY         — Long month name ("January 5, 2026")
+//   Mon D, YYYY           — Short month name ("Jan 5, 2026")
+// Junk values (blank, "-", "N/A", etc.) return empty string.
 export function normalizeDateString(val: string | undefined): string {
   if (!val || val.trim() === '') return ''
   const s = val.trim()
+
+  // Already ISO
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-  const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/)
-  if (slashMatch) {
-    const [, m, d, y] = slashMatch
+
+  // M/D/YY or M/D/YYYY (US slash — Excel default)
+  const slashUS = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/)
+  if (slashUS) {
+    const [, m, d, y] = slashUS
     const year = y.length === 2 ? `20${y}` : y
     return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
   }
+
+  // MM-DD-YYYY or MM-DD-YY or M-D-YYYY or M-D-YY (US dash)
+  const dashUS = s.match(/^(\d{1,2})-(\d{1,2})-(\d{2}|\d{4})$/)
+  if (dashUS) {
+    const [, m, d, y] = dashUS
+    const year = y.length === 2 ? `20${y}` : y
+    return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+  }
+
+  // DD.MM.YYYY (European dot — Google Sheets with European locale)
+  const dotEU = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)
+  if (dotEU) {
+    const [, d, m, y] = dotEU
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+  }
+
+  // "Month D, YYYY" or "Mon D, YYYY" (long or short month name)
+  const MONTHS: Record<string, string> = {
+    january: '01', february: '02', march: '03', april: '04',
+    may: '05', june: '06', july: '07', august: '08',
+    september: '09', october: '10', november: '11', december: '12',
+    jan: '01', feb: '02', mar: '03', apr: '04',
+    jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+  }
+  const longMonth = s.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})$/)
+  if (longMonth) {
+    const [, monthStr, d, y] = longMonth
+    const m = MONTHS[monthStr.toLowerCase()]
+    if (m) return `${y}-${m}-${d.padStart(2, '0')}`
+  }
+
   return ''
 }
 
