@@ -13,6 +13,52 @@ These rules are permanent and override default behavior every session.
 
 ---
 
+## Daily development workflow
+
+### Starting a feature
+
+```bash
+git checkout staging && git pull origin staging
+git checkout -b feature/my-feature-name
+
+supabase start
+supabase db reset --local   # clean slate with seed data
+npm run dev:local            # http://localhost:5173
+```
+
+Sign in: `playwright@example.com` / `playwright-test-pw!`
+
+### While developing
+
+```bash
+npx vitest run      # must pass before every commit
+npm run test:e2e    # optional but recommended (local Supabase must be running)
+```
+
+### Push to staging for review
+
+```bash
+git add <specific files>
+git commit -m "feat(scope): description"
+git push origin feature/my-feature-name
+```
+
+Open PR on GitHub: `feature/*` → `staging`. CI runs automatically (unit + E2E). Must be green to merge. After merge, `migrate-staging.yml` applies any new migrations to staging Supabase automatically.
+
+### Verify on staging
+
+Open the Vercel staging URL (Vercel dashboard → the `staging` branch deployment). Sign in and confirm the feature works. If something is wrong, fix it on a new `feature/*` branch — never push directly to `staging`.
+
+### Promote to production
+
+Open PR on GitHub: `staging` → `main`. CI runs again. After merge, `migrate-prod.yml` applies migrations to prod and Vercel deploys to the production URL.
+
+```bash
+supabase stop   # when done for the day
+```
+
+---
+
 ## Branch model
 
 ```
