@@ -11,7 +11,8 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
-    "dev:local": "vite --mode test"
+    "dev:local": "vite --mode test",
+    "dev:staging": "vite --mode staging"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.8",

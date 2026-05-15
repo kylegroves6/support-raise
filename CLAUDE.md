@@ -4,72 +4,106 @@ These rules are permanent and override default behavior every session.
 
 ---
 
+## Session startup checklist
+
+1. Read this file
+2. Read `docs/DECISIONS.md` and `docs/OPEN_QUESTIONS.md`
+3. Summarize active state and open questions
+4. Ask if there is a spec before touching any code
+
+---
+
+## Branch model
+
+```
+feature/* → PR to staging → CI green → merge → verify on staging → PR to main → CI green → merge → prod
+```
+
+| Branch | Environment | Database | Deploy |
+|--------|-------------|----------|--------|
+| `feature/*` | local only | local Docker Postgres | never deployed |
+| `staging` | staging | staging Supabase project | Vercel (staging preview) via CI |
+| `main` | production | prod Supabase `wzfrfgqnjkvgadsqtgvb` | Vercel (production) via CI |
+
+- Always branch `feature/*` off `staging`, not `main`
+- Never commit directly to `staging` or `main`
+- Both `staging` and `main` require PR + CI green (branch protection — see OPEN_QUESTIONS.md for setup steps)
+
+---
+
+## Environment variables
+
+| Variable | Local | Staging | Production |
+|----------|-------|---------|------------|
+| `VITE_SUPABASE_URL` | auto from `supabase start` | staging project URL | `https://wzfrfgqnjkvgadsqtgvb.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | auto from `supabase start` | staging anon key | prod anon key |
+| `VITE_SENTRY_DSN` | empty / omit | empty / omit | set in Vercel env vars |
+
+- Local values are exported by `supabase start` and written to `$GITHUB_ENV` in CI — never hardcoded
+- Staging values go in `.env.staging.local` (gitignored)
+- Production values live in Vercel env vars only — never in any `.env` file in this repo
+
+---
+
 ## Database safety — non-negotiable
 
-### Never push to remote without explicit confirmation
-`supabase db push` writes to the **production Supabase project** (`wzfrfgqnjkvgadsqtgvb`).
-Never run it, suggest it, or let it happen automatically. Always stop and ask:
-> "Ready to push this migration to the remote (production) database — confirm?"
+### CLI is linked to staging only
+The Supabase CLI (`supabase link`) is linked to the **staging** project. Production migrations are applied exclusively by `migrate-prod.yml` via the `PROD_DB_PASSWORD` GitHub secret. Never re-link to production from a local machine.
 
-### Always develop against local first
-The correct migration workflow is:
-1. Write the `.sql` file in `supabase/migrations/`
-2. Apply to **local** via docker:
+### Migration workflow
+1. Write `.sql` file in `supabase/migrations/`
+2. Apply to **local** via Docker:
    ```
    docker exec supabase_db_Support-Raising psql -U postgres -d postgres < supabase/migrations/<file>.sql
    ```
-3. Verify the table/column exists locally:
+3. Verify locally:
    ```
    supabase db query "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;"
    ```
-4. Run tests (`npx vitest run`) — all must pass
-5. **Only then**, with explicit user confirmation, run `supabase db push`
+4. Run `npx vitest run` — all must pass
+5. Commit migration file + code together on a `feature/*` branch
+6. Open PR to `staging` → CI runs → merge → `migrate-staging.yml` applies migration to staging Supabase
+7. Verify on staging
+8. Open PR to `main` → CI runs → merge → `migrate-prod.yml` applies migration to prod Supabase
 
-### Take a schema backup before any remote change
-Before running `supabase db push`, always dump the current remote schema first:
+### Take a schema backup before any manual remote change
 ```
-supabase db dump --linked --schema-only > backups/schema-remote-$(date +%Y%m%d-%H%M).sql
+supabase db dump --linked --schema-only > backups/schema-staging-$(date +%Y%m%d-%H%M).sql
 ```
-Keep backups in `backups/`. They are gitignored (add `backups/` to `.gitignore` if not already there).
+Keep backups in `backups/`. Gitignored.
 
-### Migration hygiene (existing rule — keep it)
-1. Every schema change lives in a numbered file in `supabase/migrations/`
-2. Migration file is committed to git alongside the code that depends on it
-3. Never run DDL in the Supabase dashboard SQL editor or Studio — migrations only
+### Migration hygiene
+1. Every schema change = a numbered file in `supabase/migrations/`
+2. Migration committed to git alongside the code that depends on it
+3. Never run DDL in Supabase Studio or SQL Editor — migrations only
 4. Run `supabase migration list` before any push to verify local/remote are in sync
 
 ---
 
 ## Dev environment
 
-### Two environments — never mix them up
+### Three environments
 
-| | Local | Production |
-|---|---|---|
-| Supabase URL | `http://127.0.0.1:54321` | `https://wzfrfgqnjkvgadsqtgvb.supabase.co` |
-| Dev server | `npm run dev:local` | `npm run dev` |
-| Postgres container | `supabase_db_Support-Raising` | remote cloud (never touch directly) |
-| Data | wiped on `supabase db reset --local` | persistent — real user data |
+| | Local | Staging | Production |
+|---|---|---|---|
+| Supabase URL | `http://127.0.0.1:54321` | staging project URL | `https://wzfrfgqnjkvgadsqtgvb.supabase.co` |
+| Dev server | `npm run dev:local` | `npm run dev:staging` | `npm run dev` (never use for dev) |
+| Postgres container | `supabase_db_Support-Raising` | staging cloud | prod cloud (never touch directly) |
+| Data | wiped on `supabase db reset --local` | persistent test data | real user data |
 
 ### Starting local Supabase (requires Docker running)
 
 ```bash
-supabase start          # boots the local docker stack
+supabase start             # boots the local docker stack
 supabase db reset --local  # applies all migrations + seed.sql (wipes data)
-npm run dev:local       # dev server pointed at local Supabase
+npm run dev:local          # dev server pointed at local Supabase
 ```
 
 Local login: `playwright@example.com` / `playwright-test-pw!`
 
-### Stopping local Supabase
-
 ```bash
 supabase stop
 ```
-
-### Default dev server points at production
-
-`npm run dev` (no `:local`) connects to the live Supabase project. Never run this for feature development — use `npm run dev:local`.
 
 ---
 
@@ -89,14 +123,14 @@ npx vitest run
 supabase start
 npm run test:e2e
 ```
-The Playwright suite runs `supabase db reset --local` automatically via `globalSetup` — no manual reset needed.
+The Playwright suite runs `supabase db reset --local` automatically via `globalSetup`.
 
 ---
 
 ## General coding rules
 
 - No comments unless the WHY is non-obvious
-- No modal, no abstraction beyond what the task requires
+- No abstraction beyond what the task requires
 - Prefer editing existing files over creating new ones
 - Do not push to the remote git repository unless explicitly asked
 
@@ -104,10 +138,33 @@ The Playwright suite runs `supabase db reset --local` automatically via `globalS
 
 ## Key facts about this project
 
-- Local Supabase: `http://127.0.0.1:54321` — local postgres container: `supabase_db_Support-Raising`
-- Remote Supabase project ID: `wzfrfgqnjkvgadsqtgvb` (production — treat with care)
 - Stack: Vite + React + TypeScript + Tailwind, deployed to Vercel
+- Local Supabase container: `supabase_db_Support-Raising`
+- Prod Supabase project ID: `wzfrfgqnjkvgadsqtgvb`
 - camelCase ↔ snake_case mapping lives in `src/hooks/useContacts.ts`
 - RLS pattern: `(SELECT auth.uid()) = user_id` on all tables, all operations
 - `returning` is a Postgres reserved word — always quoted as `"returning"` in SQL
-- Couple contacts use flat `is_couple boolean` + `spouse_first_name text` columns on `contacts` (migration `20260511200000`). No separate household table.
+- Couple contacts: flat `is_couple boolean` + `spouse_first_name text` on `contacts` (migration `20260511200000`). No separate household table.
+- Architecture decisions: `docs/DECISIONS.md`
+- Open questions: `docs/OPEN_QUESTIONS.md`
+
+---
+
+## GitHub branch protection settings (apply manually in GitHub UI)
+
+Go to `github.com/kylegroves6/support-raise` → Settings → Branches → Add ruleset:
+
+**Branch: `main`**
+- Target: `main`
+- Require a pull request before merging: ✅
+- Required status checks: `test` (from `ci.yml`)
+- Require branches to be up to date: ✅
+- Block force pushes: ✅
+- Restrict deletions: ✅
+
+**Branch: `staging`**
+- Target: `staging`
+- Require a pull request before merging: ✅
+- Required status checks: `test` (from `ci.yml`)
+- Require branches to be up to date: ✅
+- Block force pushes: ✅

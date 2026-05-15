@@ -206,25 +206,5 @@ events — decide when the workflow is clearer from real use.
 ---
 
 ## Decisions log
-- **Skipped Docker/Express** — went straight to Supabase
-- **Keeping Vite** — right fit for personal use; reconsider Next.js only at Phase 3
-- **TypeScript** — migrated April 2026; shared types catch schema mismatches at compile time
-- **Supabase URL + publishable key are not secrets** — go in `.env` and Vercel env vars
-- **Bitwarden Secrets Manager** — reserved for Phase 2 Anthropic API key
-- **`returning` is a Postgres reserved word** — must be quoted as `"returning"` in SQL
-- **`returning` field is derived, not stored** — computed at query time from `contact_trips` history: a contact is "returning" if they have `financial_partner = true` on any trip *other than* the current one. Distinguishes contacts who have actually donated on a prior trip from contacts who simply carried over without giving. Original DB column was dropped; value is now set at the call site in `useContacts.ts` after `fromContactRow()` runs.
-- **camelCase ↔ snake_case mapping** lives in `useContacts.ts`
-- **RLS uses `(SELECT auth.uid())` pattern** — evaluated once per query, not per row
-- **No SQL Editor / dashboard for DDL** — migrations only
-- **`salutation` kept** — useful for letter drafting; auto-populated from `first_name` in UI
-- **`full_name` dropped** — migration `20260510004000_drop_full_name.sql` applied to prod; column is gone
-- **Activity heatmap removed from Dashboard** — built and reverted; `useActivityLog` hook kept
-  for "Follow-up Needed" chip; heatmap can be revisited in Phase 2 alongside print/AI features
-- **Couple/family names** — backfill left as-is for existing contacts; new contacts enforce
-  separate first/last fields; display_name or organization override approach deferred to Phase 2
-- **Relationship field is now a constrained select** — "Add new…" escape hatch saves custom values; required for consistent AI tone prompting in Phase 2
-- **Country field is a searchable select** — ~60 countries inline in ContactModal, no external package; defaults to United States
-- **Template CSV is auto-derived from COLUMN_MAP** — no manual sync needed; example row values are the only manual maintenance; round-trip unit test guards against column drift
-- **Phone normalization deferred** — `normalizePhoneString` planned for Phase 2 backlog (strip formatting on import + normalize on blur in ContactModal)
-- **Playwright Radix Select pattern** — options render in a portal; use `page.locator('[role="option"]', { hasText: '...' })` not `getByRole('option')`
-- **Property-based testing with fast-check** — installed as devDep; used for csvParser functions where input space is large and functions are pure
+
+Moved to [`docs/DECISIONS.md`](docs/DECISIONS.md) — that is the canonical source going forward.
