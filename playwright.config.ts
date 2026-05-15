@@ -21,7 +21,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'npm run dev:local',
     url: 'http://localhost:5173',
     reuseExistingServer: true,
     env: {
