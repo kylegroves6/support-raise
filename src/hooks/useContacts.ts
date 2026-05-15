@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { getCurrentUserId } from '../lib/auth'
-import type { Contact, HouseholdMember } from '../types'
+import type { Contact } from '../types'
 
 // Permanent contact columns (no per-trip fields)
 const CONTACT_CAMEL_TO_SNAKE: Record<string, string> = {
@@ -21,6 +21,8 @@ const CONTACT_CAMEL_TO_SNAKE: Record<string, string> = {
   concatenatedAddress: 'concatenated_address',
   phone: 'phone',
   email: 'email',
+  isCouple: 'is_couple',
+  spouseFirstName: 'spouse_first_name',
 }
 
 // Per-trip columns that live in contact_trips
@@ -45,17 +47,6 @@ const TRIP_DEFAULTS = {
   pledgedToGive: false, formOfGift: '', giftAmount: 0, dateReceived: '',
 }
 
-function fromHouseholdMemberRow(row: DbRow): HouseholdMember {
-  return {
-    id: row['id'] as string,
-    contactId: row['contact_id'] as string,
-    firstName: (row['first_name'] as string) ?? '',
-    lastName: (row['last_name'] as string | null) ?? undefined,
-    role: (row['role'] as HouseholdMember['role']) ?? 'spouse',
-    createdAt: row['created_at'] as string | undefined,
-  }
-}
-
 function fromContactRow(row: DbRow): Omit<Contact, keyof typeof TRIP_DEFAULTS | 'contactTripId'> {
   return {
     id: row['id'] as string,
@@ -76,6 +67,8 @@ function fromContactRow(row: DbRow): Omit<Contact, keyof typeof TRIP_DEFAULTS | 
     concatenatedAddress: (row['concatenated_address'] as string) ?? '',
     phone: (row['phone'] as string) ?? '',
     email: (row['email'] as string) ?? '',
+    isCouple: (row['is_couple'] as boolean) ?? false,
+    spouseFirstName: (row['spouse_first_name'] as string | null) ?? undefined,
     createdAt: row['created_at'] as string | undefined,
     updatedAt: row['updated_at'] as string | undefined,
   }
@@ -129,7 +122,7 @@ export function useContacts(tripId: string | null | undefined) {
     getCurrentUserId().then(userId =>
     supabase
       .from('contacts')
-      .select(`*, contact_trips!left(*), household_members(*)`)
+      .select(`*, contact_trips!left(*)`)
       .eq('user_id', userId)
       .order('created_at', { ascending: true })
     ).then(({ data, error }) => {
@@ -141,11 +134,9 @@ export function useContacts(tripId: string | null | undefined) {
           const returning = (tripRows ?? []).some(
             t => t['trip_id'] !== tripId && t['financial_partner'] === true
           )
-          const memberRows = (row['household_members'] as DbRow[] | null) ?? []
           return {
             ...fromContactRow(row),
             returning,
-            householdMembers: memberRows.map(fromHouseholdMemberRow),
             ...(tripRow ? fromTripRow(tripRow) : { ...TRIP_DEFAULTS, contactTripId: undefined }),
           } as Contact
         })
@@ -334,32 +325,6 @@ export function useContacts(tripId: string | null | undefined) {
     setContacts([])
   }, [])
 
-  const addHouseholdMember = useCallback(async (
-    contactId: string,
-    member: Pick<HouseholdMember, 'firstName' | 'lastName' | 'role'>
-  ): Promise<HouseholdMember> => {
-    const userId = await getCurrentUserId()
-    const { data, error } = await supabase
-      .from('household_members')
-      .insert({
-        contact_id: contactId,
-        user_id: userId,
-        first_name: member.firstName,
-        last_name: member.lastName ?? null,
-        role: member.role,
-      })
-      .select()
-      .single()
-    if (error) throw error
-    const hm = fromHouseholdMemberRow(data as DbRow)
-    setContacts(prev => prev.map(c =>
-      c.id === contactId
-        ? { ...c, householdMembers: [...(c.householdMembers ?? []), hm] }
-        : c
-    ))
-    return hm
-  }, [])
-
   const deleteMany = useCallback(async (ids: string[]): Promise<void> => {
     if (ids.length === 0) return
     await supabase.from('contacts').delete().in('id', ids)
@@ -405,7 +370,6 @@ export function useContacts(tripId: string | null | undefined) {
   return {
     contacts, loading, error,
     addContact, updateContact, deleteContact,
-    addHouseholdMember,
     importContacts, replaceAll, deleteAll, deleteMany, updateMany,
     ensureAllContactTrips,
     ensureContactTrip,

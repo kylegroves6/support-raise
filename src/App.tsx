@@ -30,7 +30,7 @@ export default function App() {
 
 function AuthenticatedApp() {
   const { activeTrip, createTrip, updateActiveTrip } = useTrips()
-  const { contacts, addContact, updateContact, deleteContact, addHouseholdMember, importContacts, replaceAll, deleteAll, deleteMany, updateMany, ensureAllContactTrips } = useContacts(activeTrip?.id)
+  const { contacts, addContact, updateContact, deleteContact, importContacts, replaceAll, deleteAll, deleteMany, updateMany, ensureAllContactTrips } = useContacts(activeTrip?.id)
   const { items: additionalItems, additionalTotal, addItem, updateItem, deleteItem } = useAdditionalRaising()
   const { followUpNeeded } = useActivityLog()
   const totalGoal = (activeTrip?.tripCost ?? 0) + additionalTotal
@@ -217,7 +217,6 @@ function AuthenticatedApp() {
             activeTrip={activeTrip}
             contacts={contacts}
             addContact={addContact}
-            addHouseholdMember={addHouseholdMember}
             onCreateTrip={() => setShowRollover(true)}
           />
         )}

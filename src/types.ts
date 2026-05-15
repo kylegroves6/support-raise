@@ -1,12 +1,3 @@
-export interface HouseholdMember {
-  id: string
-  contactId: string
-  firstName: string
-  lastName?: string  // null = shares contact's last name
-  role: 'spouse' | 'partner' | 'child' | 'other'
-  createdAt?: string
-}
-
 export interface Contact {
   id: string
   firstName: string
@@ -26,11 +17,13 @@ export interface Contact {
   concatenatedAddress: string
   phone: string
   email: string
+  isCouple: boolean
+  spouseFirstName?: string
   createdAt?: string
   updatedAt?: string
   // per-trip fields — populated from contact_trips for the active trip
   sent: boolean
-thankYouSent: boolean
+  thankYouSent: boolean
   followedUp: boolean
   responded: boolean
   financialPartner: boolean
@@ -41,8 +34,6 @@ thankYouSent: boolean
   dateReceived: string
   // present when loaded with trip data
   contactTripId?: string
-  // household members loaded alongside the contact
-  householdMembers?: HouseholdMember[]
 }
 
 export interface Trip {

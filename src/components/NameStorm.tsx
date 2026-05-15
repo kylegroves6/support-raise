@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import type { Contact, HouseholdMember, Trip } from '../types'
+import type { Contact, Trip } from '../types'
 
 export const RELATIONSHIP_SUGGESTIONS = [
   'Family', 'Friend', 'Family Friend', "Friend's Parents",
@@ -39,7 +39,6 @@ interface Props {
   activeTrip: Trip | null
   contacts: Contact[]
   addContact: (data: Partial<Contact>) => Promise<Contact>
-  addHouseholdMember: (contactId: string, member: Pick<HouseholdMember, 'firstName' | 'lastName' | 'role'>) => Promise<HouseholdMember>
   onCreateTrip: () => void
 }
 
@@ -55,24 +54,14 @@ function normalize(s: string) {
   return s.trim().toLowerCase()
 }
 
-/**
- * Detects duplicate/conflict warnings for a given first+last name against the
- * full contacts list (which includes householdMembers).
- *
- * Rules:
- * - Exact first+last match → warn (includes contacts where primary IS a couple member)
- * - Last name empty → warn against ALL contacts sharing that first name (any last name)
- * - Spouse/partner in household_members with matching first+last → warn
- * - Primary name in household_members (the contact itself) with matching first+last → warn
- * - Same first name, different non-empty last name → no warning
- */
-function detectWarnings(contacts: Contact[], firstName: string, lastName: string): DuplicateWarning[] {
+function detectWarnings(contacts: Contact[], firstName: string, lastName: string, spouseFirstName = ''): DuplicateWarning[] {
   const fn = normalize(firstName)
   const ln = normalize(lastName)
+  const sp = normalize(spouseFirstName)
   if (!fn) return []
 
   const warnings: DuplicateWarning[] = []
-  const seen = new Set<string>() // dedupe by message
+  const seen = new Set<string>()
 
   function addWarning(w: DuplicateWarning) {
     if (!seen.has(w.message)) {
@@ -103,16 +92,25 @@ function detectWarnings(contacts: Contact[], firstName: string, lastName: string
       })
     }
 
-    // Case: matches a household member (spouse/partner/child/other) on this contact
-    for (const m of c.householdMembers ?? []) {
-      const memberFirst = normalize(m.firstName)
-      // member last name: use explicit last name if set, otherwise inherit contact's last name
-      const memberLast = m.lastName !== undefined ? normalize(m.lastName) : contactLast
-
-      if (memberFirst === fn && (ln === '' || memberLast === ln)) {
+    // Case: matches the spouse on a couple contact (spouse inherits contact's last name)
+    if (c.isCouple && c.spouseFirstName) {
+      const spouseFirst = normalize(c.spouseFirstName)
+      if (spouseFirst === fn && (ln === '' || contactLast === ln)) {
         const coupleDisplay = c.organization || displayName
         addWarning({
           message: `${firstName.trim()} ${lastName.trim()} may already be in your contacts as part of ${coupleDisplay}.`,
+          existingNote: c.notes || undefined,
+        })
+      }
+    }
+
+    // Case: form is a couple and both primary + spouse names match an existing couple contact
+    if (sp && c.isCouple && c.spouseFirstName) {
+      const contactSpouse = normalize(c.spouseFirstName)
+      if (contactFirst === fn && contactLast === ln && contactSpouse === sp) {
+        const coupleDisplay = c.organization || buildCoupleOrg(c.firstName, c.lastName, c.spouseFirstName)
+        addWarning({
+          message: `${coupleDisplay} is already in your contacts as a couple.`,
           existingNote: c.notes || undefined,
         })
       }
@@ -122,7 +120,7 @@ function detectWarnings(contacts: Contact[], firstName: string, lastName: string
   return warnings
 }
 
-export default function NameStorm({ activeTrip, contacts, addContact, addHouseholdMember, onCreateTrip }: Props) {
+export default function NameStorm({ activeTrip, contacts, addContact, onCreateTrip }: Props) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [spouseFirstName, setSpouseFirstName] = useState('')
@@ -150,8 +148,8 @@ export default function NameStorm({ activeTrip, contacts, addContact, addHouseho
 
   // Compute warnings live as the user types
   const duplicateWarnings = useMemo(
-    () => detectWarnings(contacts, firstName, lastName),
-    [firstName, lastName, contacts]
+    () => detectWarnings(contacts, firstName, lastName, spouseFirstName),
+    [firstName, lastName, spouseFirstName, contacts]
   )
 
   const clearForm = useCallback(() => {
@@ -191,16 +189,9 @@ export default function NameStorm({ activeTrip, contacts, addContact, addHouseho
         organization: org || undefined,
         notes: nt || undefined,
         relationship,
+        isCouple,
+        spouseFirstName: isCouple && spouseFirstName.trim() ? spouseFirstName.trim() : undefined,
       })
-
-      // Save spouse as a household member when couple mode is on
-      if (isCouple && spouseFirstName.trim()) {
-        await addHouseholdMember(contact.id, {
-          firstName: spouseFirstName.trim(),
-          lastName: undefined, // inherits contact's last name
-          role: 'spouse',
-        })
-      }
 
       const entry: SavedEntry = {
         id: contact.id,

@@ -110,4 +110,4 @@ The Playwright suite runs `supabase db reset --local` automatically via `globalS
 - camelCase ↔ snake_case mapping lives in `src/hooks/useContacts.ts`
 - RLS pattern: `(SELECT auth.uid()) = user_id` on all tables, all operations
 - `returning` is a Postgres reserved word — always quoted as `"returning"` in SQL
-- `household_members` table exists in local + remote (migration `20260511195103`) — design decision pending on whether to keep it, simplify to flat `is_couple`/`spouse_first_name` columns, or drop it entirely. Do not build on top of it until the user decides.
+- Couple contacts use flat `is_couple boolean` + `spouse_first_name text` columns on `contacts` (migration `20260511200000`). No separate household table.
