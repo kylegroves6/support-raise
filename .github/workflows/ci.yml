@@ -50,6 +50,15 @@ jobs:
           done
           echo "Auth never became ready" && exit 1
 
+      - name: Verify auth token endpoint works
+        run: |
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
+            -X POST "http://127.0.0.1:54321/auth/v1/token?grant_type=password" \
+            -H "apikey: ${VITE_SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"playwright@example.com","password":"playwright-test-pw!"}')
+          echo "Response: $RESPONSE"
+
       - name: Run unit tests
         run: npm test -- --run
 
