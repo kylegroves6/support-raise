@@ -13,8 +13,7 @@ async function signIn(page: Page) {
   await page.getByRole('button', { name: 'Sign in' }).click()
 }
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY ?? ''
+import { supabaseUrl as SUPABASE_URL, supabaseAnonKey as SUPABASE_KEY } from '../playwright.config'
 
 // Returns a JWT for the test user (used by cleanup helpers).
 async function getTestToken(request: import('@playwright/test').APIRequestContext): Promise<string> {

@@ -2,8 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 
 const TEST_EMAIL = 'playwright@example.com'
 const TEST_PASSWORD = 'playwright-test-pw!'
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY ?? ''
+import { supabaseUrl as SUPABASE_URL, supabaseAnonKey as SUPABASE_KEY } from '../playwright.config'
 
 async function signIn(page: Page) {
   await page.goto('/')
