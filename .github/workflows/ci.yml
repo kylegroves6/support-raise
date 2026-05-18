@@ -50,19 +50,6 @@ jobs:
           done
           echo "Auth never became ready" && exit 1
 
-      - name: Diagnose env vars and auth endpoint
-        run: |
-          CLEAN_URL=$(echo "${VITE_SUPABASE_URL}" | tr -d '\r')
-          CLEAN_KEY=$(echo "${VITE_SUPABASE_ANON_KEY}" | tr -d '\r')
-          echo "VITE_SUPABASE_URL='${CLEAN_URL}' (len=${#CLEAN_URL})"
-          echo "VITE_SUPABASE_ANON_KEY length=${#CLEAN_KEY}"
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
-            -X POST "${CLEAN_URL}/auth/v1/token?grant_type=password" \
-            -H "apikey: ${CLEAN_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{"email":"playwright@example.com","password":"playwright-test-pw!"}')
-          echo "Auth response: $RESPONSE"
-
       - name: Run unit tests
         run: npm test -- --run
 

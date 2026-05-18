@@ -13,15 +13,11 @@ async function signIn(page: Page) {
 }
 
 async function getTestToken(request: import('@playwright/test').APIRequestContext): Promise<string> {
-  console.log('[diag] SUPABASE_URL=', SUPABASE_URL, 'keyLen=', SUPABASE_KEY?.length ?? 0)
   const authRes = await request.post(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
     data: { email: TEST_EMAIL, password: TEST_PASSWORD },
   })
-  const status = authRes.status()
-  const bodyText = await authRes.text()
-  console.log('[diag] status=', status, 'body=', bodyText?.slice(0, 300))
-  const { access_token } = JSON.parse(bodyText) as { access_token: string }
+  const { access_token } = await authRes.json() as { access_token: string }
   return access_token
 }
 
@@ -48,7 +44,7 @@ test('name storm: add 3 names and verify they appear in contacts table in insert
 
   // Navigate to Name Storm tab
   await page.getByRole('button', { name: 'Name Storm' }).click()
-  await expect(page.getByText('Name Storm')).toBeVisible({ timeout: 5000 })
+  await expect(page.getByRole('heading', { name: 'Name Storm' })).toBeVisible({ timeout: 5000 })
 
   const names = [
     { first: 'NSTest1', last: 'Alpha', rel: 'Friend' },
