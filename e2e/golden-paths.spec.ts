@@ -17,11 +17,15 @@ import { supabaseUrl as SUPABASE_URL, supabaseAnonKey as SUPABASE_KEY } from '..
 
 // Returns a JWT for the test user (used by cleanup helpers).
 async function getTestToken(request: import('@playwright/test').APIRequestContext): Promise<string> {
+  console.log('[diag] SUPABASE_URL=', SUPABASE_URL, 'keyLen=', SUPABASE_KEY?.length ?? 0)
   const authRes = await request.post(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
     data: { email: TEST_EMAIL, password: TEST_PASSWORD },
   })
-  const { access_token } = await authRes.json() as { access_token: string }
+  const status = authRes.status()
+  const bodyText = await authRes.text()
+  console.log('[diag] status=', status, 'body=', bodyText?.slice(0, 300))
+  const { access_token } = JSON.parse(bodyText) as { access_token: string }
   return access_token
 }
 
