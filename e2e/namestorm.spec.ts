@@ -53,8 +53,8 @@ test('name storm: add 3 names and verify they appear in contacts table in insert
   ]
 
   for (const { first, last, rel } of names) {
-    // Pick category
-    await page.locator('select[data-testid="relationship-select"]').selectOption(rel)
+    // Pick category tab
+    await page.getByTestId(`tab-${rel}`).click()
 
     // Fill first name
     await page.getByTestId('first-name-input').fill(first)
