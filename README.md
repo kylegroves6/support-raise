@@ -52,65 +52,67 @@ App runs at http://localhost:5173. Sign up for an account on first visit.
 
 ---
 
-## Daily use
+## Development workflow
+
+### Environments
+
+| | Local | Staging | Production |
+|---|---|---|---|
+| URL | `http://localhost:5173` | Vercel staging URL | Vercel production URL |
+| Database | Local Docker Postgres | Staging Supabase | Prod Supabase |
+| Purpose | All active development | Verify before promoting | Live app — never develop here |
+
+### Feature workflow
 
 ```bash
-npm run dev
-```
+# 1. Branch off staging (never off main)
+git checkout staging && git pull origin staging
+git checkout -b feature/my-feature
 
-The default `npm run dev` points at the **cloud** Supabase project (`.env`). If the cloud project is paused or you want to work offline, use local Supabase instead (see below).
-
----
-
-## Local development with Supabase
-
-To run the full stack locally (no cloud dependency):
-
-**1. Start the local Supabase Docker stack:**
-```bash
+# 2. Start local stack (requires Docker)
 supabase start
+supabase db reset --local   # applies all migrations + seed data
+npm run dev:local            # http://localhost:5173
+# sign in: playwright@example.com / playwright-test-pw!
+
+# 3. Develop, then run tests before committing
+npx vitest run               # unit tests — must pass
+npm run test:e2e             # E2E tests (local Supabase must be running)
+
+# 4. Commit and open PR to staging
+git push origin feature/my-feature
+# GitHub: open PR feature/* → staging
+# CI runs automatically — must be green to merge
+# After merge: migrations auto-apply to staging Supabase, Vercel builds staging preview
+
+# 5. Open the staging Vercel URL and verify the feature works
+
+# 6. Open PR staging → main to ship to production
+# CI runs again — must be green to merge
+# After merge: migrations auto-apply to prod, Vercel deploys
+
+supabase stop   # when done for the day
 ```
 
-**2. Seed the database:**
-```bash
-supabase db reset --local
-```
-This applies all migrations and loads `supabase/seed.sql`, which creates the test user and four sample contacts.
-
-**3. Run the dev server pointed at local Supabase:**
-```bash
-npm run dev:local
-```
-App runs at `http://localhost:5173`. Sign in with:
-- **Email:** `playwright@example.com`
-- **Password:** `playwright-test-pw!`
-
-**To stop:**
-```bash
-supabase stop
-```
-
-> Data added during a local session is wiped the next time you run `supabase db reset --local`. This is intentional — the local stack is for development and testing, not persistent data.
+> Local data is wiped on every `supabase db reset --local` — intentional. Local is for development, not persistence.
 
 ---
 
 ## Testing
 
-**Unit tests (174):**
+**Unit tests:**
 ```bash
-npm test -- --run
+npx vitest run
 ```
 
-**E2E tests (11 Playwright tests against local Supabase):**
+**E2E tests (Playwright against local Supabase):**
 ```bash
-# Supabase must be running first
 supabase start
-
 npm run test:e2e
 ```
-The Playwright suite automatically runs `supabase db reset --local` before starting (via `globalSetup`), so the database is always in a clean seed state regardless of what a prior run left behind. You do not need to run `db reset` manually before E2E tests.
+`globalSetup` resets the database automatically before the suite — no manual reset needed.
 
-**CI:** GitHub Actions runs both test suites on every push to `main` (see `.github/workflows/ci.yml`). The workflow starts its own local Supabase stack — no cloud credentials needed.
+**CI:** GitHub Actions runs both suites on every push and PR to `main` or `staging`. Spins up its own local Supabase stack — no cloud credentials needed in CI.
 
 ---
 

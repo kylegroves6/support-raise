@@ -6,31 +6,15 @@ Questions that are unresolved and block or inform upcoming work. Resolve each be
 
 ## Active
 
-### [2026-05-15] Staging Supabase project ref
-**Status:** Pending — user needs to create the project.
-**Blocks:** `migrate-staging.yml` going live; CLI re-link; Vercel staging env vars.
-**Action:** Create project at supabase.com/dashboard, then:
-1. Add `STAGING_PROJECT_REF` and `STAGING_DB_PASSWORD` to GitHub secrets
-2. Add `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` to Vercel (scoped to `staging` branch)
-3. Run `supabase link --project-ref <staging-ref>` locally
-4. Run `supabase migration list` to confirm all 16 migrations apply cleanly
+### [2026-05-18] Sentry replay CSP fix not yet in production
+**Status:** Fix committed to `feature/update-workflow-docs` (commit `8459117`), pending merge to staging → main.
+**Blocks:** Sentry session replay working in production. Basic error capture (non-replay) may work once DSN confirmed.
+**Action:** Merge PR #2 → staging → verify on staging preview → PR staging → main. After prod deploy, throw a test error in the browser console and confirm it appears in Sentry dashboard within 30s. Note: `VITE_SENTRY_DSN` is intentionally production-only in Vercel; replay will not work on staging and that is expected.
 
-### [2026-05-15] Production DB password in GitHub secrets
-**Status:** Pending — needed for `migrate-prod.yml`.
-**Blocks:** Automated prod migration on merge to `main`.
-**Action:** Add `PROD_PROJECT_REF=wzfrfgqnjkvgadsqtgvb` and `PROD_DB_PASSWORD` to GitHub repo secrets at github.com/kylegroves6/support-raise/settings/secrets/actions.
-
-### [2026-05-15] GitHub branch protection rules
-**Status:** Pending — must be applied manually in GitHub UI.
-**Blocks:** Enforcement of the no-direct-push policy.
-**Action:** In GitHub → Settings → Branches → Add ruleset:
-- Branch `main`: require PR, require `test` job green, no direct pushes, no force push
-- Branch `staging`: require PR, require `test` job green, no direct pushes
-
-### [2026-05-15] Sentry DSN not in Vercel env vars
-**Status:** Pending.
-**Blocks:** Error tracking in production.
-**Action:** Add `VITE_SENTRY_DSN` to Vercel project settings (production environment).
+### [2026-05-18] Sentry DSN confirmation pending
+**Status:** DSN added back to Vercel production env vars (2026-05-18) but not yet verified end-to-end.
+**Blocks:** Confidence that error tracking is active in production.
+**Action:** After PR #2 merges to main and deploys, open production URL, open browser console, type `allow pasting`, then: `throw new Error("Sentry connection test")`. Check Sentry dashboard → Issues. If it appears within 30s, mark resolved.
 
 ---
 
@@ -53,7 +37,24 @@ Questions that are unresolved and block or inform upcoming work. Resolve each be
 
 ## Resolved
 
-_(Move resolved items here with the resolution date and outcome.)_
+### [2026-05-15 → 2026-05-18] CI/CD pipeline standing up
+**Resolved:** 2026-05-18
+**Outcome:** Full three-tier pipeline operational. All items below confirmed done:
+- Staging Supabase project created ✅
+- All 5 GitHub secrets set (`SUPABASE_ACCESS_TOKEN`, `STAGING_PROJECT_REF`, `STAGING_DB_PASSWORD`, `PROD_PROJECT_REF`, `PROD_DB_PASSWORD`) ✅
+- Branch protection on `main` and `staging` confirmed via GitHub API ✅
+- CI pipeline fixed: 0/13 → 13/13 E2E passing (see `docs/CI_POSTMORTEM.md` for full root-cause breakdown) ✅
+- `migrate-staging.yml` and `migrate-prod.yml` wired and ready ✅
+- `seed-staging.yml` manual workflow added — run from GitHub Actions UI to populate staging with test data ✅
+- CSP `worker-src blob:` fix added for Sentry replay (in PR #2, not yet in prod) ✅
+
+### [2026-05-15] Production DB password in GitHub secrets
+**Resolved:** 2026-05-15
+**Outcome:** `PROD_PROJECT_REF` and `PROD_DB_PASSWORD` confirmed present in GitHub secrets.
+
+### [2026-05-15] GitHub branch protection rules
+**Resolved:** 2026-05-18
+**Outcome:** Both `main` and `staging` confirmed protected via `gh api` — require PR + CI green, no direct pushes.
 
 ---
 
@@ -65,3 +66,12 @@ _(Move resolved items here with the resolution date and outcome.)_
 - Created docs/DECISIONS.md and docs/OPEN_QUESTIONS.md
 - Set up CI workflows for staging and prod migration gating
 - Pending: user to create staging Supabase project, set GitHub secrets, apply branch protection
+
+### 2026-05-18
+- Debugged full CI pipeline: root cause was CRLF/quoted env vars from `supabase status` corrupting auth URL → all 13 E2E tests failing at 0ms
+- Fixed 9 distinct failures across 4 layers (infra, env parsing, test logic) — full breakdown in `docs/CI_POSTMORTEM.md`
+- Added CI env var smoke test step to `ci.yml` — catches quoting bugs before tests run
+- Strengthened CLAUDE.md Testing section: E2E required after UI changes, selector maintenance discipline added
+- Added `seed-staging.yml` manual workflow — fires only on workflow_dispatch, staging secrets only, no prod path
+- Fixed CSP: added `worker-src blob:` to allow Sentry replay workers (commit `8459117`, in PR #2)
+- PR #2 open and CI running — next step is merge to staging, verify, then promote to main
