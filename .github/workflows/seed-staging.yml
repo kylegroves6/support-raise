@@ -1,0 +1,35 @@
+name: Seed staging
+
+# Manual trigger only — never fires automatically on any branch event.
+# Run this from GitHub UI (Actions → Seed staging → Run workflow) to populate
+# the staging Supabase project with realistic test data from supabase/seed.sql.
+#
+# Safety: this workflow uses STAGING_* secrets only. It has no access to
+# PROD_DB_PASSWORD and cannot affect the production database.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to staging project
+        run: supabase link --project-ref ${{ secrets.STAGING_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Seed staging database
+        run: supabase db execute --file supabase/seed.sql
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
