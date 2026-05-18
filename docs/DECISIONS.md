@@ -6,6 +6,15 @@ Canonical record of decisions made during development. New decisions go here; do
 
 ## Environment & Deployment
 
+### CI env var extraction uses `tr -d '"\r'` on `supabase status` output (May 2026)
+`supabase status --output env` produces shell-assignment syntax: `API_URL="http://..."\r`. The surrounding double-quotes and CRLF line ending must be stripped before writing to `$GITHUB_ENV`. Failure to do so produces a malformed URL that returns an empty HTTP body, which causes `JSON.parse('')` to throw in Playwright's `beforeAll` and kills all 13 tests at 0ms. Fix: pipe through `| tr -d '"\r'`. A smoke-test step in `ci.yml` now validates the URL format and auth reachability immediately after extraction. Full root-cause analysis: `docs/CI_POSTMORTEM.md`.
+
+### Staging seed data is manual, not automatic (May 2026)
+`seed-staging.yml` is triggered only via `workflow_dispatch` in GitHub Actions UI — never on branch events. Reasons: (1) prevents seed data from resetting manual test state on every merge, (2) staging secrets are scoped only to this workflow so there is no prod path, (3) `migrate-prod.yml` uses `supabase db push` which reads only `supabase/migrations/` — `seed.sql` is structurally invisible to prod. To seed: GitHub Actions → "Seed staging" → Run workflow.
+
+### Sentry replay requires `worker-src blob:` in CSP (May 2026)
+Sentry's replay integration spawns blob: workers. Without `worker-src blob:` explicitly in the CSP, browsers fall back to `script-src` which blocks blob: URLs. Added to `vercel.json`. `VITE_SENTRY_DSN` is intentionally scoped to the production environment in Vercel only — staging does not run Sentry.
+
 ### Three-tier branch + environment model (May 2026)
 - `feature/*` branches off `staging`; PR opens against `staging`
 - `staging` branch deploys to Vercel staging preview + staging Supabase project
