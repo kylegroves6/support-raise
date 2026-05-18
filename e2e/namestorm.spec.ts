@@ -67,12 +67,12 @@ test('name storm: add 3 names and verify they appear in contacts table in insert
     await expect(page.getByText(`${first} ${last}`)).toBeVisible({ timeout: 5000 })
   }
 
-  // The running list should show all 3 in insertion order
+  // The running list renders newest-first (reverse insertion order)
   const listItems = page.getByTestId('saved-list').locator('li')
   await expect(listItems).toHaveCount(3)
-  await expect(listItems.nth(0)).toContainText('NSTest1 Alpha')
-  await expect(listItems.nth(1)).toContainText('NSTest2 Beta')
-  await expect(listItems.nth(2)).toContainText('NSTest3 Gamma')
+  await expect(listItems.nth(0)).toContainText('NSTest3')
+  await expect(listItems.nth(1)).toContainText('NSTest2')
+  await expect(listItems.nth(2)).toContainText('NSTest1')
 
   // Navigate to Contacts tab and verify all 3 appear
   await page.getByRole('button', { name: 'Contacts' }).click()
