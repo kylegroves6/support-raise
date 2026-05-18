@@ -42,21 +42,22 @@ jobs:
           [[ "$VITE_SUPABASE_URL" == http* ]] || { echo "VITE_SUPABASE_URL is malformed: [$VITE_SUPABASE_URL]"; exit 1; }
           [[ "$VITE_SUPABASE_URL" != *'"'* ]] || { echo "VITE_SUPABASE_URL contains quotes"; exit 1; }
           [[ -n "$VITE_SUPABASE_ANON_KEY" ]] || { echo "VITE_SUPABASE_ANON_KEY is empty"; exit 1; }
-          curl -sf "${VITE_SUPABASE_URL}/auth/v1/health" >/dev/null || { echo "Auth endpoint unreachable at ${VITE_SUPABASE_URL}"; exit 1; }
           echo "Env vars OK — URL=${VITE_SUPABASE_URL}"
 
       - name: Apply migrations and seed
         run: supabase db reset --local
 
       - name: Wait for Supabase auth to be ready
+        # db reset recreates the Postgres container, which restarts gotrue.
+        # Poll until auth is accepting requests before running any tests.
         run: |
-          for i in $(seq 1 20); do
+          for i in $(seq 1 45); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:54321/auth/v1/health)
-            if [ "$STATUS" = "200" ]; then echo "Auth ready"; exit 0; fi
-            echo "Waiting for auth... ($i)"
-            sleep 2
+            if [ "$STATUS" = "200" ]; then echo "Auth ready after $i attempts"; exit 0; fi
+            echo "Waiting for auth... ($i/45)"
+            sleep 3
           done
-          echo "Auth never became ready" && exit 1
+          echo "Auth never became ready after 135s" && exit 1
 
       - name: Run unit tests
         run: npm test -- --run
