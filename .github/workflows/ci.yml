@@ -37,6 +37,14 @@ jobs:
           echo "VITE_SUPABASE_URL=${SUPABASE_URL}" >> "$GITHUB_ENV"
           echo "VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}" >> "$GITHUB_ENV"
 
+      - name: Validate Supabase env vars
+        run: |
+          [[ "$VITE_SUPABASE_URL" == http* ]] || { echo "VITE_SUPABASE_URL is malformed: [$VITE_SUPABASE_URL]"; exit 1; }
+          [[ "$VITE_SUPABASE_URL" != *'"'* ]] || { echo "VITE_SUPABASE_URL contains quotes"; exit 1; }
+          [[ -n "$VITE_SUPABASE_ANON_KEY" ]] || { echo "VITE_SUPABASE_ANON_KEY is empty"; exit 1; }
+          curl -sf "${VITE_SUPABASE_URL}/auth/v1/health" >/dev/null || { echo "Auth endpoint unreachable at ${VITE_SUPABASE_URL}"; exit 1; }
+          echo "Env vars OK — URL=${VITE_SUPABASE_URL}"
+
       - name: Apply migrations and seed
         run: supabase db reset --local
 

@@ -169,7 +169,33 @@ npx vitest run
 supabase start
 npm run test:e2e
 ```
-The Playwright suite runs `supabase db reset --local` automatically via `globalSetup`.
+The Playwright suite runs `supabase db reset --local` automatically via `globalSetup` (skipped in CI — the workflow handles the reset as its own step).
+
+### When E2E is required locally
+
+E2E is not optional after UI changes. Run `npm run test:e2e` locally whenever you:
+- Touch a component that has a corresponding Playwright spec
+- Rename, remove, or replace a DOM element (button, select, input, heading)
+- Change sort order, filter logic, or list rendering in any component covered by E2E tests
+- Add or remove a page, route, or tab
+
+Unit tests verify logic. E2E tests verify that the UI a real user sees actually works.
+
+### Test maintenance discipline
+
+When you change a component, open `e2e/` and check for tests that reference it before committing:
+
+```bash
+grep -r "data-testid\|getByText\|getByRole" e2e/ | grep "<the thing you changed>"
+```
+
+If a test references a control you removed or renamed: **update the test in the same commit.** A passing unit suite with a broken E2E spec is not a green build — it is a time-delayed CI failure.
+
+Specific patterns that break E2E tests silently during local development:
+- Replacing a `<select>` with tab buttons (selector becomes stale)
+- Adding a second element with the same visible text (strict mode violation)
+- Reversing or re-sorting a list (index-based assertions flip)
+- Adding async re-renders between an action and an assertion (use `toBeVisible()`, not `toHaveCount()`)
 
 ---
 
