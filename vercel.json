@@ -6,7 +6,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://*.sentry.io; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.supabase.co https://*.sentry.io; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'"
         }
       ]
     }
