@@ -32,6 +32,12 @@ export default {
           light: '#c4b5a8',
           dark: '#4a3f38',
         },
+        cru: {
+          blue: '#007398',
+          'blue-light': '#3eb1c8',
+          gold: '#f9b625',
+          gray: '#666062',
+        },
       },
       boxShadow: {
         'card': '0 2px 12px rgba(74, 63, 56, 0.08)',

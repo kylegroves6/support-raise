@@ -11,19 +11,23 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['e2e/**', 'node_modules/**'],
   },
+  server: {
+    allowedHosts: ['localhost', '.ngrok-free.app', '.ngrok.io'],
+  },
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Support Tracker',
-        short_name: 'Support',
-        description: 'Mission fundraising support tracker',
-        theme_color: '#6b7c5e',
-        background_color: '#f5f0e8',
+        name: 'Raise',
+        short_name: 'Raise',
+        description: 'Support raising tracker for mission trips',
+        theme_color: '#007398',
+        background_color: '#007398',
         display: 'standalone',
         icons: [
-          { src: '/icons.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
         ],
       },
     }),
