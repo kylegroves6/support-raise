@@ -6,6 +6,18 @@ Canonical record of decisions made during development. New decisions go here; do
 
 ## Environment & Deployment
 
+### CI env var extraction uses `tr -d '"\r'` on `supabase status` output (May 2026)
+`supabase status --output env` produces shell-assignment syntax: `API_URL="http://..."\r`. The surrounding double-quotes and CRLF line ending must be stripped before writing to `$GITHUB_ENV`. Failure to do so produces a malformed URL that returns an empty HTTP body, which causes `JSON.parse('')` to throw in Playwright's `beforeAll` and kills all 13 tests at 0ms. Fix: pipe through `| tr -d '"\r'`. A smoke-test step in `ci.yml` now validates the URL format and auth reachability immediately after extraction. Full root-cause analysis: `docs/CI_POSTMORTEM.md`.
+
+### Staging seed data is automatic on every staging merge (May 2026, revised)
+`deploy.yml` runs `psql ... -f supabase/seed.sql` as part of `deploy-staging` after every merge to `staging`. Staging data is intentionally ephemeral — treat it as a disposable test environment, not a place to accumulate manual test state. Secrets are scoped to the `staging` GitHub Environment so the prod DB password is physically unreadable from the staging job. Original decision (manual-only via `workflow_dispatch`) was reversed when the pipeline was consolidated into a single `deploy.yml`.
+
+### Sentry replay requires `worker-src blob:` in CSP (May 2026)
+Sentry's replay integration spawns blob: workers. Without `worker-src blob:` explicitly in the CSP, browsers fall back to `script-src` which blocks blob: URLs. Added to `vercel.json`. `VITE_SENTRY_DSN` is intentionally scoped to the production environment in Vercel only — staging does not run Sentry.
+
+### Single unified deploy.yml replaces four separate workflow files (May 2026)
+`ci.yml`, `migrate-staging.yml`, `migrate-prod.yml`, and `seed-staging.yml` replaced by a single `deploy.yml` with three jobs: `test`, `deploy-staging`, `deploy-prod`. Jobs are chained via `needs: test` so deployment is blocked until tests pass. `deploy-prod` targets the `production` GitHub Environment which requires manual approval before the job runs. Vercel auto-deploy is disabled in Vercel project settings; both environments deploy via `vercel deploy` inside CI so the frontend and DB migrations are always in sync and both gated together.
+
 ### Three-tier branch + environment model (May 2026)
 - `feature/*` branches off `staging`; PR opens against `staging`
 - `staging` branch deploys to Vercel staging preview + staging Supabase project

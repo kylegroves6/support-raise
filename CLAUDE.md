@@ -13,6 +13,52 @@ These rules are permanent and override default behavior every session.
 
 ---
 
+## Daily development workflow
+
+### Starting a feature
+
+```bash
+git checkout staging && git pull origin staging
+git checkout -b feature/my-feature-name
+
+supabase start
+supabase db reset --local   # clean slate with seed data
+npm run dev:local            # http://localhost:5173
+```
+
+Sign in: `playwright@example.com` / `playwright-test-pw!`
+
+### While developing
+
+```bash
+npx vitest run      # must pass before every commit
+npm run test:e2e    # optional but recommended (local Supabase must be running)
+```
+
+### Push to staging for review
+
+```bash
+git add <specific files>
+git commit -m "feat(scope): description"
+git push origin feature/my-feature-name
+```
+
+Open PR on GitHub: `feature/*` → `staging`. CI runs automatically (unit + E2E). Must be green to merge. After merge, `migrate-staging.yml` applies any new migrations to staging Supabase automatically.
+
+### Verify on staging
+
+Open the Vercel staging URL (Vercel dashboard → the `staging` branch deployment). Sign in and confirm the feature works. If something is wrong, fix it on a new `feature/*` branch — never push directly to `staging`.
+
+### Promote to production
+
+Open PR on GitHub: `staging` → `main`. CI runs again. After merge, `migrate-prod.yml` applies migrations to prod and Vercel deploys to the production URL.
+
+```bash
+supabase stop   # when done for the day
+```
+
+---
+
 ## Branch model
 
 ```
@@ -123,7 +169,33 @@ npx vitest run
 supabase start
 npm run test:e2e
 ```
-The Playwright suite runs `supabase db reset --local` automatically via `globalSetup`.
+The Playwright suite runs `supabase db reset --local` automatically via `globalSetup` (skipped in CI — the workflow handles the reset as its own step).
+
+### When E2E is required locally
+
+E2E is not optional after UI changes. Run `npm run test:e2e` locally whenever you:
+- Touch a component that has a corresponding Playwright spec
+- Rename, remove, or replace a DOM element (button, select, input, heading)
+- Change sort order, filter logic, or list rendering in any component covered by E2E tests
+- Add or remove a page, route, or tab
+
+Unit tests verify logic. E2E tests verify that the UI a real user sees actually works.
+
+### Test maintenance discipline
+
+When you change a component, open `e2e/` and check for tests that reference it before committing:
+
+```bash
+grep -r "data-testid\|getByText\|getByRole" e2e/ | grep "<the thing you changed>"
+```
+
+If a test references a control you removed or renamed: **update the test in the same commit.** A passing unit suite with a broken E2E spec is not a green build — it is a time-delayed CI failure.
+
+Specific patterns that break E2E tests silently during local development:
+- Replacing a `<select>` with tab buttons (selector becomes stale)
+- Adding a second element with the same visible text (strict mode violation)
+- Reversing or re-sorting a list (index-based assertions flip)
+- Adding async re-renders between an action and an assertion (use `toBeVisible()`, not `toHaveCount()`)
 
 ---
 

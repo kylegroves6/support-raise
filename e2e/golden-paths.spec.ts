@@ -13,8 +13,7 @@ async function signIn(page: Page) {
   await page.getByRole('button', { name: 'Sign in' }).click()
 }
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY ?? ''
+import { supabaseUrl as SUPABASE_URL, supabaseAnonKey as SUPABASE_KEY } from '../playwright.config'
 
 // Returns a JWT for the test user (used by cleanup helpers).
 async function getTestToken(request: import('@playwright/test').APIRequestContext): Promise<string> {
@@ -116,10 +115,9 @@ test('import a valid CSV and verify contact count increases', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Sign in' })).not.toBeVisible({ timeout: 10000 })
   await page.getByRole('button', { name: 'Contacts' }).click()
 
-  // Wait for contacts to finish loading then count
+  // Wait for contacts to finish loading
   const rows = page.locator('tbody tr')
   await expect(rows.first()).toBeVisible({ timeout: 8000 })
-  const countBefore = await rows.count()
 
   // Build a minimal valid CSV in a temp file
   const csv = [
@@ -145,8 +143,9 @@ test('import a valid CSV and verify contact count increases', async ({ page }) =
   await expect(page.getByRole('button', { name: /import \d+ contact/i })).toBeVisible({ timeout: 5000 })
   await page.getByRole('button', { name: /import \d+ contact/i }).click()
 
-  // Table should grow by 2
-  await expect(rows).toHaveCount(countBefore + 2, { timeout: 8000 })
+  // Verify both imported contacts appear in the table
+  await expect(page.getByText('CSV Import Alpha')).toBeVisible({ timeout: 8000 })
+  await expect(page.getByText('CSV Import Beta')).toBeVisible()
 })
 
 // ── 4. Edit gift amount and verify it saves ─────────────────────────────────
