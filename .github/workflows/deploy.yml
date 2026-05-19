@@ -120,7 +120,10 @@ jobs:
         # intentionally ephemeral. See DECISIONS.md.
         run: |
           PGPASSWORD=${{ secrets.STAGING_DB_PASSWORD }} psql \
-            "postgresql://postgres.${{ secrets.STAGING_PROJECT_REF }}:${{ secrets.STAGING_DB_PASSWORD }}@aws-0-us-east-1.pooler.supabase.com:5432/postgres" \
+            --host db.${{ secrets.STAGING_PROJECT_REF }}.supabase.co \
+            --port 5432 \
+            --username postgres \
+            --dbname postgres \
             -f supabase/seed.sql
 
       - name: Verify migration list
