@@ -1,78 +1,64 @@
-// Generates icon-192.png and icon-512.png from scratch using pure Node.js
-// Cru Deep Blue circle with white upward arrow
+// Generates icon-192.png and icon-512.png
+// Solid blue square (maskable-safe) with white chevron+stem arrow
 import { createWriteStream } from 'fs'
 import { deflateSync } from 'zlib'
 
 function generatePNG(size) {
-  const bg = { r: 0, g: 115, b: 152 }   // #007398
-  const fg = { r: 255, g: 255, b: 255 } // white
+  const bg = { r: 0, g: 115, b: 152 }
+  const fg = { r: 255, g: 255, b: 255 }
   const pixels = new Uint8Array(size * size * 4)
 
-  const cx = size / 2
-  const cy = size / 2
-  const radius = size / 2
+  // Full-bleed blue square (Android/iOS mask to their shape)
+  for (let i = 0; i < size * size; i++) {
+    pixels[i * 4]     = bg.r
+    pixels[i * 4 + 1] = bg.g
+    pixels[i * 4 + 2] = bg.b
+    pixels[i * 4 + 3] = 255
+  }
 
-  // Arrow geometry scaled to icon size
-  const strokeW = size * 0.078   // ~40px at 512
-  const arrowTop = size * 0.313  // ~160px at 512
-  const arrowBot = size * 0.688  // ~352px at 512
-  const arrowLeft = size * 0.313 // ~160px at 512
-  const arrowRight = size * 0.688
-  const arrowMid = size * 0.5
+  const s = size
+  const strokeW = s * 0.09
 
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (y * size + x) * 4
-      const dx = x - cx
-      const dy = y - cy
-      const dist = Math.sqrt(dx * dx + dy * dy)
+  // Safe zone inset 20% each side → content between 0.2–0.8
+  // Arrow centered in safe zone
+  const tipX     = s * 0.50
+  const tipY     = s * 0.22   // top of chevron (the point)
+  const midY     = s * 0.45   // where wings meet stem
+  const botY     = s * 0.80   // bottom of stem (taller)
+  const wingX    = s * 0.27   // outer x of each wing tip
 
-      if (dist > radius) {
-        // Transparent outside circle
-        pixels[idx] = 0; pixels[idx+1] = 0; pixels[idx+2] = 0; pixels[idx+3] = 0
-        continue
-      }
+  // Helper: signed distance from point (px,py) to line segment (ax,ay)→(bx,by)
+  function distToSegment(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay
+    const lenSq = dx * dx + dy * dy
+    if (lenSq === 0) return Math.hypot(px - ax, py - ay)
+    const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq))
+    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+  }
 
-      // Default: background blue
-      let r = bg.r, g = bg.g, b = bg.b
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      const idx = (y * s + x) * 4
 
-      // Vertical stem: x near center, y between arrowTop and arrowBot
-      const onStem = Math.abs(x - arrowMid) <= strokeW / 2 && y >= arrowTop && y <= arrowBot
+      // Vertical stem: chevron join down to bottom
+      const onStem = distToSegment(x, y, tipX, midY, tipX, botY) <= strokeW / 2
 
-      // Chevron: two diagonal arms meeting at (arrowMid, arrowTop)
-      // Left arm: from (arrowLeft, arrowMid) to (arrowMid, arrowTop)
-      const leftArmDx = arrowMid - arrowLeft
-      const leftArmDy = arrowTop - arrowMid  // negative (going up)
-      const leftLen = Math.sqrt(leftArmDx * leftArmDx + leftArmDy * leftArmDy)
-      const leftUx = leftArmDx / leftLen
-      const leftUy = leftArmDy / leftLen
-      const lPx = x - arrowLeft
-      const lPy = y - arrowMid
-      const lT = lPx * leftUx + lPy * leftUy
-      const lPerp = Math.abs(lPx * (-leftUy) + lPy * leftUx)
-      const onLeft = lT >= 0 && lT <= leftLen && lPerp <= strokeW / 2
+      // Left arm: from left wing tip to arrow tip
+      const onLeft = distToSegment(x, y, wingX, midY, tipX, tipY) <= strokeW / 2
 
-      // Right arm: from (arrowMid, arrowTop) to (arrowRight, arrowMid)
-      const rightArmDx = arrowRight - arrowMid
-      const rightArmDy = arrowMid - arrowTop
-      const rightLen = Math.sqrt(rightArmDx * rightArmDx + rightArmDy * rightArmDy)
-      const rightUx = rightArmDx / rightLen
-      const rightUy = rightArmDy / rightLen
-      const rPx = x - arrowMid
-      const rPy = y - arrowTop
-      const rT = rPx * rightUx + rPy * rightUy
-      const rPerp = Math.abs(rPx * (-rightUy) + rPy * rightUx)
-      const onRight = rT >= 0 && rT <= rightLen && rPerp <= strokeW / 2
+      // Right arm: from arrow tip to right wing tip
+      const onRight = distToSegment(x, y, tipX, tipY, s - wingX, midY) <= strokeW / 2
 
       if (onStem || onLeft || onRight) {
-        r = fg.r; g = fg.g; b = fg.b
+        pixels[idx]     = fg.r
+        pixels[idx + 1] = fg.g
+        pixels[idx + 2] = fg.b
+        pixels[idx + 3] = 255
       }
-
-      pixels[idx] = r; pixels[idx+1] = g; pixels[idx+2] = b; pixels[idx+3] = 255
     }
   }
 
-  // Encode as PNG
+  // PNG encode
   const chunks = []
 
   function crc32(buf) {
@@ -93,40 +79,29 @@ function generatePNG(size) {
   function chunk(type, data) {
     const typeBytes = Buffer.from(type, 'ascii')
     const len = Buffer.alloc(4); len.writeUInt32BE(data.length)
-    const crcInput = Buffer.concat([typeBytes, data])
-    const crcVal = Buffer.alloc(4); crcVal.writeUInt32BE(crc32(crcInput))
+    const crcVal = Buffer.alloc(4); crcVal.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])))
     return Buffer.concat([len, typeBytes, data, crcVal])
   }
 
-  // PNG signature
   chunks.push(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
 
-  // IHDR
   const ihdr = Buffer.alloc(13)
   ihdr.writeUInt32BE(size, 0)
   ihdr.writeUInt32BE(size, 4)
-  ihdr[8] = 8  // bit depth
-  ihdr[9] = 2  // color type: RGB (we'll handle alpha via RGBA → use type 6)
-  ihdr[9] = 6  // RGBA
-  ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0
+  ihdr[8] = 8; ihdr[9] = 6
   chunks.push(chunk('IHDR', ihdr))
 
-  // IDAT — filter byte 0 before each row
   const raw = Buffer.alloc(size * (size * 4 + 1))
   for (let y = 0; y < size; y++) {
-    raw[y * (size * 4 + 1)] = 0  // filter type None
+    raw[y * (size * 4 + 1)] = 0
     for (let x = 0; x < size; x++) {
       const src = (y * size + x) * 4
       const dst = y * (size * 4 + 1) + 1 + x * 4
-      raw[dst] = pixels[src]
-      raw[dst+1] = pixels[src+1]
-      raw[dst+2] = pixels[src+2]
-      raw[dst+3] = pixels[src+3]
+      raw[dst] = pixels[src]; raw[dst+1] = pixels[src+1]
+      raw[dst+2] = pixels[src+2]; raw[dst+3] = pixels[src+3]
     }
   }
   chunks.push(chunk('IDAT', deflateSync(raw)))
-
-  // IEND
   chunks.push(chunk('IEND', Buffer.alloc(0)))
 
   return Buffer.concat(chunks)
