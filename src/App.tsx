@@ -279,6 +279,7 @@ function AuthenticatedApp() {
             <button
               key={t}
               onClick={() => setTab(t)}
+              aria-label={t}
               className={`flex-1 flex items-center justify-center py-3 transition-colors ${
                 tab === t
                   ? 'text-cru-blue'
