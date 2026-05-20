@@ -53,6 +53,8 @@ Open the Vercel staging URL (Vercel dashboard → the `staging` branch deploymen
 
 Open PR on GitHub: `staging` → `main`. CI runs again. After merge, `migrate-prod.yml` applies migrations to prod and Vercel deploys to the production URL.
 
+**After every staging→main merge:** immediately open a `feature/sync-main-into-staging` branch off staging, merge main into it, and PR it back to staging. This keeps the git graphs in sync and prevents divergence on the next staging→main PR. If you skip this step, the next staging→main PR will show as "out of date" and the "Update branch" button will be blocked by branch protection.
+
 ```bash
 supabase stop   # when done for the day
 ```
