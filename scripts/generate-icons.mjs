@@ -26,8 +26,6 @@ function generatePNG(size) {
   const midY     = s * 0.45   // where wings meet stem
   const botY     = s * 0.80   // bottom of stem (taller)
   const wingX    = s * 0.27   // outer x of each wing tip
-  const crossY   = s * 0.63   // crossbar — lower third of stem
-  const crossX   = s * 0.27   // crossbar extends same width as wings
 
   // Helper: signed distance from point (px,py) to line segment (ax,ay)→(bx,by)
   function distToSegment(px, py, ax, ay, bx, by) {
@@ -51,10 +49,7 @@ function generatePNG(size) {
       // Right arm: from arrow tip to right wing tip
       const onRight = distToSegment(x, y, tipX, tipY, s - wingX, midY) <= strokeW / 2
 
-      // Horizontal crossbar (makes stem a cross)
-      const onCross = distToSegment(x, y, crossX, crossY, s - crossX, crossY) <= strokeW / 2
-
-      if (onStem || onLeft || onRight || onCross) {
+      if (onStem || onLeft || onRight) {
         pixels[idx]     = fg.r
         pixels[idx + 1] = fg.g
         pixels[idx + 2] = fg.b
