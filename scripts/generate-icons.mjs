@@ -22,11 +22,11 @@ function generatePNG(size) {
   // Safe zone inset 20% each side → content between 0.2–0.8
   // Arrow centered in safe zone
   const tipX     = s * 0.50
-  const tipY     = s * 0.25   // top of chevron (the point)
-  const midY     = s * 0.50   // where wings meet stem
-  const botY     = s * 0.75   // bottom of stem
+  const tipY     = s * 0.22   // top of chevron (the point)
+  const midY     = s * 0.45   // where wings meet stem
+  const botY     = s * 0.80   // bottom of stem (taller)
   const wingX    = s * 0.27   // outer x of each wing tip
-  const crossY   = s * 0.615  // vertical position of horizontal crossbar
+  const crossY   = s * 0.63   // crossbar — lower third of stem
   const crossX   = s * 0.27   // crossbar extends same width as wings
 
   // Helper: signed distance from point (px,py) to line segment (ax,ay)→(bx,by)
