@@ -60,6 +60,22 @@ Questions that are unresolved and block or inform upcoming work. Resolve each be
 
 ## Session Log
 
+### 2026-05-19 (issue #35)
+- Bumped all GitHub Actions in `deploy.yml` to Node.js 24-compatible versions ahead of June 2, 2026 cutover: checkout v4→v6, setup-node v4→v6, cache v4→v5, upload-artifact v4→v7, supabase/setup-cli v1→v2
+- No code changes, no tests required — workflow-only change on current sync branch
+
+### 2026-05-20
+- PWA icon fully working on Android — solid blue square, chevron+stem arrow, no white fringe
+- Fixed manifest 401: index.html now points to /manifest.webmanifest (VitePWA-generated), removed redundant public/manifest.json
+- Added aria-label to bottom nav buttons (Lighthouse accessibility fix)
+- Added iOS PWA meta tags (apple-mobile-web-app-capable, status-bar-style, title) — PR #34 staging→main pending merge
+- Discovered staging/main git graph divergence caused by merge commits after staging→main PRs — documented fix in CLAUDE.md: always open a sync PR (feature/sync-main-into-staging) immediately after every prod deploy
+- Open discussion: considering switching to trunk-based development (feature→main directly) to eliminate the sync headache. Blocked on Supabase branching — PR preview URLs have no database without it. Supabase branching is a paid feature.
+- GitHub issues created: #19–#25 (from notes), #27 (auto-delete branches), #29 (bundle size), #30 (Vercel CLI cache)
+- GitHub issues closed: #7, #9, #19, #21, #23, #25 (all resolved or duplicate)
+- Remaining open issues: #8, #12, #15, #16, #20, #22, #24, #27, #29, #30
+- Next session: merge PR #34 (iOS tags to prod), then decide on trunk-based vs staging workflow, then work on open issues (suggest starting with #15 gift field validation or #12 NameStorm keyboard)
+
 ### 2026-05-19
 - Added `allowedHosts` ngrok entry to vite.config.ts for local mobile testing
 - Built feature/ux-polish branch: mobile bottom nav (#9), header tab title (#9), PWA manifest + icons (#7)
