@@ -19,6 +19,24 @@ import type { Contact, Trip, ImportMode } from './types'
 const TABS = ['Dashboard', 'Contacts', 'Name Storm'] as const
 type Tab = typeof TABS[number]
 
+const TAB_ICONS: Record<Tab, JSX.Element> = {
+  Dashboard: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    </svg>
+  ),
+  Contacts: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  'Name Storm': (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+    </svg>
+  ),
+}
+
 export default function App() {
   const session = useSession()
 
@@ -123,19 +141,24 @@ function AuthenticatedApp() {
       <header className="bg-white border-b border-cream-300 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14">
+            {/* Mobile: current tab name centered */}
+            <span className="sm:hidden absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-stone-dark pointer-events-none">
+              {tab}
+            </span>
             <div className="relative" ref={tripMenuRef}>
               <button
-                className="flex items-center gap-3 rounded-lg px-1.5 py-1 hover:bg-cream-100 transition-colors text-left"
+                className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-cream-100 transition-colors text-left"
                 onClick={() => setTripMenuOpen(v => !v)}
               >
                 <div className="w-7 h-7 rounded-lg bg-sage-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
                   {initials || '?'}
                 </div>
-                <div>
-                  <h1 className="text-sm font-semibold text-stone-dark leading-tight">{activeTrip.missionName}</h1>
+                {/* Mission name: visible on sm+ only */}
+                <div className="hidden sm:block min-w-0">
+                  <h1 className="text-sm font-semibold text-stone-dark leading-tight truncate max-w-[160px]">{activeTrip.missionName}</h1>
                   <p className="text-xs text-stone-warm leading-tight">Support Tracker</p>
                 </div>
-                <svg className="w-3.5 h-3.5 text-stone-warm ml-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 text-stone-warm shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
@@ -164,7 +187,8 @@ function AuthenticatedApp() {
               )}
             </div>
 
-            <nav className="flex items-center gap-1">
+            {/* Desktop nav — hidden on mobile */}
+            <nav className="hidden sm:flex items-center gap-1">
               {TABS.map(t => (
                 <button
                   key={t}
@@ -183,7 +207,7 @@ function AuthenticatedApp() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-24 sm:pb-6">
         {tab === 'Dashboard' && (
           <Dashboard
             contacts={contacts}
@@ -247,6 +271,26 @@ function AuthenticatedApp() {
       {showHistory && (
         <TripHistory onClose={() => setShowHistory(false)} />
       )}
+
+      {/* Mobile bottom nav — hidden on sm+ */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-cream-300 z-10">
+        <div className="flex">
+          {TABS.map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              aria-label={t}
+              className={`flex-1 flex items-center justify-center py-3 transition-colors ${
+                tab === t
+                  ? 'text-cru-blue'
+                  : 'text-stone-warm'
+              }`}
+            >
+              {TAB_ICONS[t]}
+            </button>
+          ))}
+        </div>
+      </nav>
     </div>
   )
 }

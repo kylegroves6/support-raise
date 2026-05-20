@@ -60,6 +60,15 @@ Questions that are unresolved and block or inform upcoming work. Resolve each be
 
 ## Session Log
 
+### 2026-05-19
+- Added `allowedHosts` ngrok entry to vite.config.ts for local mobile testing
+- Built feature/ux-polish branch: mobile bottom nav (#9), header tab title (#9), PWA manifest + icons (#7)
+- #8 (NameStorm mobile) deferred — needs staging URL review on real device after this branch merges
+- Branch protection gap closed: added "Require deployments to succeed → staging" to main ruleset in GitHub UI
+- Global CLAUDE.md updated with required promotion path (feature → staging → main)
+- Next: open PR feature/ux-polish → staging, verify on staging URL on phone, then promote to main
+
+
 ### 2026-05-15
 - Established three-tier branch + environment model (feature → staging → main)
 - Committed couple-fields changeset (migration 20260511200000, 215 tests passing)
