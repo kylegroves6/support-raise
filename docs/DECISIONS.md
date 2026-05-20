@@ -6,6 +6,9 @@ Canonical record of decisions made during development. New decisions go here; do
 
 ## Environment & Deployment
 
+### GitHub Actions bumped to Node.js 24-compatible versions (May 2026)
+All actions in `deploy.yml` pinned to versions that run on the Node.js 24 runtime ahead of GitHub's June 2, 2026 forced cutover: `actions/checkout@v6`, `actions/setup-node@v6`, `actions/cache@v5`, `actions/upload-artifact@v7`, `supabase/setup-cli@v2`. Resolves issue #35.
+
 ### CI env var extraction uses `tr -d '"\r'` on `supabase status` output (May 2026)
 `supabase status --output env` produces shell-assignment syntax: `API_URL="http://..."\r`. The surrounding double-quotes and CRLF line ending must be stripped before writing to `$GITHUB_ENV`. Failure to do so produces a malformed URL that returns an empty HTTP body, which causes `JSON.parse('')` to throw in Playwright's `beforeAll` and kills all 13 tests at 0ms. Fix: pipe through `| tr -d '"\r'`. A smoke-test step in `ci.yml` now validates the URL format and auth reachability immediately after extraction. Full root-cause analysis: `docs/CI_POSTMORTEM.md`.
 
@@ -17,6 +20,9 @@ Sentry's replay integration spawns blob: workers. Without `worker-src blob:` exp
 
 ### Single unified deploy.yml replaces four separate workflow files (May 2026)
 `ci.yml`, `migrate-staging.yml`, `migrate-prod.yml`, and `seed-staging.yml` replaced by a single `deploy.yml` with three jobs: `test`, `deploy-staging`, `deploy-prod`. Jobs are chained via `needs: test` so deployment is blocked until tests pass. `deploy-prod` targets the `production` GitHub Environment which requires manual approval before the job runs. Vercel auto-deploy is disabled in Vercel project settings; both environments deploy via `vercel deploy` inside CI so the frontend and DB migrations are always in sync and both gated together.
+
+### After every staging→main merge, sync main back into staging (May 2026)
+Merging staging→main creates a merge commit on main that staging doesn't have, causing graph divergence. Fix: immediately after every prod deploy, open `feature/sync-main-into-staging` off staging, merge main into it, PR to staging. Skip this and the next staging→main PR will show "out of date" with "Update branch" blocked by branch protection.
 
 ### Three-tier branch + environment model (May 2026)
 - `feature/*` branches off `staging`; PR opens against `staging`
