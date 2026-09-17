@@ -60,6 +60,16 @@ Questions that are unresolved and block or inform upcoming work. Resolve each be
 
 ## Session Log
 
+### 2026-05-29
+- Session focused on CI/CD pipeline discussion and bug triage — no code changes made
+- CI/CD decision: keeping three-tier pipeline for now; $25/month Supabase Pro for trunk-based dev not justified at this stage of the project
+- Middle-ground idea noted: skip CI on staging→main PR (code already passed on staging push) to reduce redundant test runs — not yet implemented
+- All 42 thank-you letters sent; used existing CSV export + Word mail merge with Salutation, Street Address, City, State, Zip columns
+- Issues created last session: #41 (chip overflow), #42 (chip shows on partners), #43 (thank-you mail merge tab), #44 (receipt upload)
+- JS files in repo (tailwind.config.js, eslint.config.js, postcss.config.js) are build config, not app code — low priority to convert to TS
+- PLpgSQL in GitHub language stats comes from supabase/migrations/*.sql files — expected and normal
+- Suggested next priorities: #42 (one-liner fix), #41 (CSS fix), #27 (30-second GitHub setting), #15 (gift field validation), #24 (remove printed fields)
+
 ### 2026-05-19 (issue #35)
 - Bumped all GitHub Actions in `deploy.yml` to Node.js 24-compatible versions ahead of June 2, 2026 cutover: checkout v4→v6, setup-node v4→v6, cache v4→v5, upload-artifact v4→v7, supabase/setup-cli v1→v2
 - No code changes, no tests required — workflow-only change on current sync branch
